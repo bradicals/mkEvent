@@ -953,11 +953,17 @@ Completed in `/home/bradley/mkEvent/`:
 - Added `apiProxyCall()` to the model — a generic proxy caller for Test Connection and future API adapters.
 - Added `proxyUrl` to DEFAULT_CONFIG and local settings persistence.
 - Added Test Connection button to Settings section — calls GET /organizations/{org}/events?per_page=1 through the proxy to verify reachability, token validity, and org ID.
+- Hardened proxy with ClickBid host allowlist (cbo.bid, cbotriage.bid, cbodev.bid, cbodev2.com, cbodev3.com, cbodev4.com). Non-ClickBid URLs are rejected with 403.
+- CORS headers now sent on ALL responses including error paths — malformed requests return readable JSON errors instead of opaque CORS failures.
+- Locked proxyUrl to read-only (localhost:9999/proxy) — prevents token exfiltration via malicious proxy URL.
+- Test Connection state auto-resets to idle when environment, org ID, or token changes — prevents stale 'Connected' indicators.
+- Scaffolded the creation engine (`creation-engine.js`) with ApiClient, ProgressReporter, EventAdapter, BidderAdapter, ItemAdapter, and `createEvent` orchestrator. 11 unit tests (all pass). Supports request bodies through the proxy for POST-based creation.
+- Updated `apiProxyCall` and `proxy-server.py` to forward request bodies for POST/PUT API calls.
 
 Current next implementation step:
 
-1. Add a **Test Connection** action for selected environment + organization ID + org token.
-2. Then scaffold the real creation engine/adapters: API client, event adapter, bidder adapter, item adapter, and progress callbacks.
+1. Wire the real `create-runner.jsx` to use `CreationEngine.createEvent` instead of the current simulation.
+2. Then add real ClickBid API event creation through the creation engine.
 
 ---
 

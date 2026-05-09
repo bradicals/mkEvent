@@ -93,6 +93,8 @@ function App() {
   const [running, setRunning] = useState(false);
   const [testState, setTestState] = useState('idle');
   const [testError, setTestError] = useState('');
+  useEffect(() => { setTestState('idle'); setTestError(''); },
+    [cfg.api.env, cfg.api.organizationId, cfg.api.orgToken, cfg.api.baseUrl]);
   const importInputRef = useRef(null);
   const recipe = useMemo(() => EVENT_MODEL.buildRecipe(cfg), [cfg]);
   const summary = useMemo(() => EVENT_MODEL.summarizeRecipe(recipe), [recipe]);

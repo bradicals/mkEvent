@@ -231,8 +231,8 @@ window.SettingsBody = function SettingsBody({ data, set, onTestConnection, testS
       </div>
       <div className="field span-2">
         <label>Local proxy URL</label>
-        <input type="text" value={data.proxyUrl || ''} onChange={e => set({ proxyUrl: e.target.value })} placeholder="http://localhost:9999/proxy" />
-        <div className="help">CORS proxy for API calls from the browser. Defaults to localhost:9999.</div>
+        <input type="text" value={data.proxyUrl || 'http://localhost:9999/proxy'} readOnly />
+        <div className="help">Fixed to localhost:9999. The proxy accepts API calls from the browser and forwards them to allowed ClickBid hosts only.</div>
       </div>
       <div className="field span-full">
         <div className="callout warn">

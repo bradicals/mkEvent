@@ -319,11 +319,15 @@
     };
   }
 
-  function apiProxyCall(proxyUrl, targetUrl, method, headers) {
+  function apiProxyCall(proxyUrl, targetUrl, method, headers, body) {
+    const payload = { url: targetUrl, method: method || 'GET', headers: headers || {} };
+    if (body !== undefined && body !== null) {
+      payload.body = typeof body === 'string' ? body : JSON.stringify(body);
+    }
     return fetch(proxyUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: targetUrl, method: method || 'GET', headers: headers || {} }),
+      body: JSON.stringify(payload),
     }).then(resp => resp.json());
   }
 
