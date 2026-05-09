@@ -56,6 +56,7 @@
       orgToken: '',
       eventToken: '',
       browser: 'chromium',
+      proxyUrl: 'http://localhost:9999/proxy',
     },
     basics: {
       name: 'QA Event',
@@ -115,10 +116,10 @@
   function validateSlug(slug) {
     const errors = [];
     const value = String(slug || '');
-    if (value.length < 3) errors.push('Slug must be at least 3 characters.');
-    if (value.length > 50) errors.push('Slug must be 50 characters or less.');
-    if (!/[a-zA-Z]/.test(value)) errors.push('Slug must contain at least one letter.');
-    if (!/^[a-z0-9-]+$/.test(value)) errors.push('Slug may contain only lowercase letters, numbers, and dashes.');
+    if (value.length < 3) errors.push('Keyword must be at least 3 characters.');
+    if (value.length > 50) errors.push('Keyword must be 50 characters or less.');
+    if (!/[a-zA-Z]/.test(value)) errors.push('Keyword must contain at least one letter.');
+    if (!/^[a-z0-9-]+$/.test(value)) errors.push('Keyword may contain only lowercase letters, numbers, and dashes.');
     return errors;
   }
 
@@ -184,13 +185,16 @@
     const safeSlug = slugifyForClickBid(config.basics.slug || config.basics.name);
     const bidders = generateBidders(config.bidders);
     const items = generateItems(config.items);
-    const baseUrl = trimTrailingSlash(config.api.baseUrl || config.api.adminBaseUrl || config.api.publicBaseUrl);
+    const envKey = ENVIRONMENTS[config.api.env] ? config.api.env : 'dev2';
+    const envPreset = ENVIRONMENTS[envKey];
+    const baseUrl = envPreset.baseUrl;
+    const apiBaseUrl = envPreset.baseUrl ? apiBaseUrlFrom(envPreset.baseUrl) : '';
     return {
       environment: {
-        id: config.api.env,
-        label: config.api.environmentLabel || config.api.env,
+        id: envKey,
+        label: envPreset.label,
         baseUrl,
-        apiBaseUrl: config.api.apiBaseUrl || apiBaseUrlFrom(baseUrl),
+        apiBaseUrl,
         adminBaseUrl: baseUrl,
         publicBaseUrl: baseUrl,
         organizationId: config.api.organizationId,
@@ -277,6 +281,7 @@
         orgToken: config.api.orgToken,
         eventToken: config.api.eventToken,
         browser: config.api.browser,
+        proxyUrl: config.api.proxyUrl,
       },
     };
   }
@@ -294,6 +299,7 @@
         orgToken: savedApi.orgToken || '',
         eventToken: savedApi.eventToken || '',
         browser: savedApi.browser || currentConfig.api.browser,
+        proxyUrl: savedApi.proxyUrl || currentConfig.api.proxyUrl,
       },
     };
   }
@@ -313,6 +319,14 @@
     };
   }
 
+  function apiProxyCall(proxyUrl, targetUrl, method, headers) {
+    return fetch(proxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: targetUrl, method: method || 'GET', headers: headers || {} }),
+    }).then(resp => resp.json());
+  }
+
   return {
     DEFAULT_CONFIG,
     ENVIRONMENTS,
@@ -321,6 +335,7 @@
     LOCAL_SETTINGS_VERSION,
     RECIPE_VERSION,
     apiBaseUrlFrom,
+    apiProxyCall,
     buildRecipe,
     environmentPatch,
     exportLocalSettings,

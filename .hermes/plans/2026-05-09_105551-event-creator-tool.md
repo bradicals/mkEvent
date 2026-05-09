@@ -946,6 +946,13 @@ Completed in `/home/bradley/mkEvent/`:
 - Added recipe export/import. Exported recipes exclude org/event tokens, and import preserves local credentials while using trusted environment presets.
 - Verified recipe export/import through the actual localhost-rendered UI on port 4173.
 - Added local settings persistence for environment, organization ID, org token, event token, and fallback browser in `localStorage`, separate from recipe export/import.
+- Renamed "URL slug" → "Event keyword" in UI labels/help text (data property stays `slug` for API compatibility).
+- Locked Settings base URL to trusted QA environment presets. Removed free-text baseUrl input. `buildRecipe` now always derives URLs from the environment preset — stale or malicious `baseUrl` values in config are ignored.
+- Added prototype security warning in Settings about localStorage and CDN dependencies; noted planned desktop OS keychain migration.
+- Built CORS proxy (`proxy-server.py`) on localhost:9999 to forward browser API calls to ClickBid, bypassing same-origin restrictions.
+- Added `apiProxyCall()` to the model — a generic proxy caller for Test Connection and future API adapters.
+- Added `proxyUrl` to DEFAULT_CONFIG and local settings persistence.
+- Added Test Connection button to Settings section — calls GET /organizations/{org}/events?per_page=1 through the proxy to verify reachability, token validity, and org ID.
 
 Current next implementation step:
 

@@ -83,7 +83,7 @@ function envSummary(api) {
   const safe = Object.hasOwn(EVENT_MODEL.ENVIRONMENTS, api.env);
   return <><span className="pill" style={{background: safe ? '#dcfce7' : '#fef3c7', color: safe ? '#166534' : '#92400e'}}>● {api.env}</span><span className="pill">{api.organizationId || 'org required'}</span></>;
 }
-function basicsSummary(b) { return <><span className="pill">{b.slug || 'slug required'}</span>{b.startDate && <span className="pill">{new Date(b.startDate + 'T' + (b.startTime||'00:00')).toLocaleDateString([], {month:'short', day:'numeric', year:'numeric'})}</span>}</>; }
+function basicsSummary(b) { return <><span className="pill">{b.slug || 'keyword required'}</span>{b.startDate && <span className="pill">{new Date(b.startDate + 'T' + (b.startTime||'00:00')).toLocaleDateString([], {month:'short', day:'numeric', year:'numeric'})}</span>}</>; }
 function biddersSummary(b) { return <><span className="pill brand">{b.count} bidders</span><span className="pill">start #{b.startNum}</span></>; }
 function itemsSummary(i) { return <><span className="pill brand">{(i.silentCount || 0) + (i.liveCount || 0) + (i.donationCount || 0)} items</span><span className="pill">{i.silentCount}S · {i.liveCount}L · {i.donationCount}D</span></>; }
 function settingsSummary(api) { return <><span className="pill">{api.apiBaseUrl ? 'API URL set' : 'API URL needed'}</span><span className="pill">{api.orgToken ? 'org token set' : 'org token needed'}</span></>; }
@@ -91,6 +91,8 @@ function settingsSummary(api) { return <><span className="pill">{api.apiBaseUrl 
 function App() {
   const [cfg, set, setCfg] = useConfig();
   const [running, setRunning] = useState(false);
+  const [testState, setTestState] = useState('idle');
+  const [testError, setTestError] = useState('');
   const importInputRef = useRef(null);
   const recipe = useMemo(() => EVENT_MODEL.buildRecipe(cfg), [cfg]);
   const summary = useMemo(() => EVENT_MODEL.summarizeRecipe(recipe), [recipe]);
@@ -125,6 +127,31 @@ function App() {
     reader.readAsText(file);
   };
 
+  const testConnection = async () => {
+    if (!cfg.api.orgToken || !cfg.api.organizationId) return;
+    setTestState('testing');
+    setTestError('');
+    const targetUrl = `${cfg.api.apiBaseUrl || EVENT_MODEL.apiBaseUrlFrom(cfg.api.baseUrl)}/organizations/${cfg.api.organizationId}/events?per_page=1`;
+    try {
+      const result = await EVENT_MODEL.apiProxyCall(cfg.api.proxyUrl, targetUrl, 'GET', {
+        'Authorization': `Bearer ${cfg.api.orgToken}`,
+        'Accept': 'application/json',
+      });
+      if (result.status >= 200 && result.status < 300) {
+        setTestState('ok');
+      } else {
+        setTestState('fail');
+        let body = '';
+        try { body = JSON.parse(result.body); } catch (_) { body = result.body; }
+        const msg = body?.message || body?.error || `HTTP ${result.status}`;
+        setTestError(String(msg).slice(0, 200));
+      }
+    } catch (error) {
+      setTestState('fail');
+      setTestError(error.message || 'Proxy unreachable');
+    }
+  };
+
   return (
     <>
       <AppTop cfg={cfg} />
@@ -154,7 +181,7 @@ function App() {
         </window.Section>
 
         <window.Section icon="fa-key" title="Settings" sub="API URLs, bearer tokens, and fallback browser." summary={settingsSummary(cfg.api)}>
-          <window.SettingsBody data={cfg.api} set={set('api')} />
+          <window.SettingsBody data={cfg.api} set={set('api')} onTestConnection={testConnection} testState={testState} testError={testError} />
         </window.Section>
       </div>
       <AppFoot

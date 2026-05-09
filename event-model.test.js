@@ -10,9 +10,9 @@ test('slugifyForClickBid produces a valid slug with at least one letter and max 
 
 test('validateSlug enforces ClickBid API slug rules', () => {
   assert.deepEqual(model.validateSlug('qa-event-1'), []);
-  assert.deepEqual(model.validateSlug('12'), ['Slug must be at least 3 characters.','Slug must contain at least one letter.']);
-  assert.deepEqual(model.validateSlug('1234'), ['Slug must contain at least one letter.']);
-  assert.deepEqual(model.validateSlug('bad slug'), ['Slug may contain only lowercase letters, numbers, and dashes.']);
+  assert.deepEqual(model.validateSlug('12'), ['Keyword must be at least 3 characters.','Keyword must contain at least one letter.']);
+  assert.deepEqual(model.validateSlug('1234'), ['Keyword must contain at least one letter.']);
+  assert.deepEqual(model.validateSlug('bad slug'), ['Keyword may contain only lowercase letters, numbers, and dashes.']);
 });
 
 test('generateBidders creates predictable API-shaped bidder records', () => {

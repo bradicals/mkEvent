@@ -76,12 +76,12 @@ window.BasicsBody = function BasicsBody({ data, set }) {
         <div className="help">Use a bug/ticket-specific name so the event is easy to find later.</div>
       </div>
       <div className="field">
-        <label>URL slug <span className="req">*</span></label>
+        <label>Event keyword <span className="req">*</span></label>
         <div className="with-prefix">
           <span className="prefix">cbo.io/</span>
           <input type="text" value={data.slug} onChange={e => { slugAuto.current = false; set({ slug: MODEL.slugifyForClickBid(e.target.value) }); }} placeholder="qa-silent-auction-bug" />
         </div>
-        <div className="help">3–50 chars, at least one letter, lowercase letters/numbers/dashes.</div>
+        <div className="help">3–50 chars, at least one letter, lowercase letters/numbers/dashes. Used as the event URL keyword.</div>
         {slugErrors.length > 0 && <div className="help" style={{ color: '#b91c1c' }}>{slugErrors.join(' ')}</div>}
       </div>
       <div className="field">
@@ -211,29 +211,34 @@ window.ItemsBody = function ItemsBody({ data, set }) {
   );
 };
 
-window.SettingsBody = function SettingsBody({ data, set }) {
+window.SettingsBody = function SettingsBody({ data, set, onTestConnection, testState, testError }) {
   const [showOrg, setShowOrg] = useState(false);
   const [showEvent, setShowEvent] = useState(false);
-  const setBaseUrl = (baseUrl) => {
-    const cleanBaseUrl = String(baseUrl || '').replace(/\/$/, '');
-    set({
-      baseUrl: cleanBaseUrl,
-      apiBaseUrl: MODEL.apiBaseUrlFrom(cleanBaseUrl),
-      adminBaseUrl: cleanBaseUrl,
-      publicBaseUrl: cleanBaseUrl,
-    });
-  };
+  const currentBaseUrl = data.baseUrl || MODEL.ENVIRONMENTS[data.env]?.baseUrl || '';
+  const currentApiBaseUrl = data.apiBaseUrl || MODEL.apiBaseUrlFrom(currentBaseUrl);
+  const canTest = data.orgToken && data.organizationId;
   return (
     <div className="form-grid">
       <div className="field span-2">
-        <label>Base URL <span className="req">*</span></label>
-        <input type="text" value={data.baseUrl || ''} onChange={e => setBaseUrl(e.target.value)} placeholder="https://cbodev4.com" />
-        <div className="help">Admin and public URLs are derived from this same base URL.</div>
+        <label>Environment base URL</label>
+        <input type="text" value={currentBaseUrl} readOnly />
+        <div className="help">Derived from the selected environment. URLs are locked to trusted QA presets.</div>
       </div>
       <div className="field span-2">
         <label>API base URL</label>
-        <input type="text" value={data.apiBaseUrl || MODEL.apiBaseUrlFrom(data.baseUrl)} readOnly />
-        <div className="help">Derived as base URL + /api/v4.</div>
+        <input type="text" value={currentApiBaseUrl} readOnly />
+        <div className="help">Always {currentBaseUrl || '{baseUrl}'}/api/v4.</div>
+      </div>
+      <div className="field span-2">
+        <label>Local proxy URL</label>
+        <input type="text" value={data.proxyUrl || ''} onChange={e => set({ proxyUrl: e.target.value })} placeholder="http://localhost:9999/proxy" />
+        <div className="help">CORS proxy for API calls from the browser. Defaults to localhost:9999.</div>
+      </div>
+      <div className="field span-full">
+        <div className="callout warn">
+          <i className="fa-solid fa-triangle-exclamation"></i>
+          <div><strong>Prototype security note</strong> — Bearer tokens below are stored in browser localStorage. This is acceptable for a local development prototype but not for shared or internet-facing use. The planned desktop app will use the OS keychain instead.</div>
+        </div>
       </div>
       <div className="field">
         <label>Org bearer token <span className="req">*</span></label>
@@ -262,10 +267,18 @@ window.SettingsBody = function SettingsBody({ data, set }) {
         </select>
         <div className="help">Only used for gaps the API cannot cover.</div>
       </div>
+      <div className="field span-full" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button className="btn btn-outline" disabled={!canTest || testState === 'testing'} onClick={onTestConnection}>
+          <i className={`fa-solid ${testState === 'testing' ? 'fa-spinner fa-spin' : 'fa-plug'}`}></i>
+          {testState === 'testing' ? ' Testing…' : testState === 'ok' ? ' Connected' : testState === 'fail' ? ' Connection failed' : ' Test connection'}
+        </button>
+        {testState === 'ok' && <span style={{ color: '#166534', fontWeight: 600 }}>✓ Connected to {data.env} / org {data.organizationId}</span>}
+        {testState === 'fail' && testError && <span style={{ color: '#b91c1c' }}>{testError}</span>}
+      </div>
       <div className="field span-full">
         <div className="callout">
           <i className="fa-solid fa-key"></i>
-          <div>Environment, organization ID, tokens, and fallback browser are saved locally for this workstation. Exported event recipes still exclude tokens.</div>
+          <div>Environment, organization ID, tokens, and fallback browser are saved locally for this workstation. Exported event recipes do not include tokens. URLs are locked to trusted QA environment presets — arbitrary base URLs are not accepted.</div>
         </div>
       </div>
     </div>
