@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "created": "2026-05-09T16:26:23.030Z",
+  "modified": "2026-05-09T16:32:15.391Z",
+  "objects": [
+    {
+      "id": "eo45nraem",
+      "type": "rect",
+      "x": 392,
+      "y": 139.11111068725586,
+      "width": 541,
+      "height": 662,
+      "data": {
+        "fill": null,
+        "stroke": "#8B2500",
+        "strokeWidth": 2
+      }
+    },
+    {
+      "id": "uwxjr8kib",
+      "type": "text",
+      "x": 431.0667723626064,
+      "y": 175.9891629743003,
+      "data": {
+        "content": "MkEvent",
+        "fontSize": 16,
+        "color": "#2D7DD2",
+        "bold": false
+      },
+      "width": 87.6565972569191,
+      "height": 21
+    },
+    {
+      "id": "2zjzbbl21",
+      "type": "rect",
+      "x": 413.85055844061753,
+      "y": 249.4152349141573,
+      "width": 311.76628965701,
+      "height": 28.974562235781576,
+      "data": {
+        "fill": null,
+        "stroke": "#C2622D",
+        "strokeWidth": 2
+      }
+    },
+    {
+      "id": "wvowqem21",
+      "type": "text",
+      "x": 424.2814008454989,
+      "y": 232.03049757268835,
+      "data": {
+        "content": "event name",
+        "fontSize": 16,
+        "color": "#C2622D",
+        "bold": false
+      },
+      "width": 83,
+      "height": 21
+    },
+    {
+      "id": "y41lloyxi",
+      "type": "rect",
+      "x": 415.0095409300488,
+      "y": 314.3182543223081,
+      "width": 232.9554803756841,
+      "height": 31.29252721464411,
+      "data": {
+        "fill": null,
+        "stroke": "#C2622D",
+        "strokeWidth": 2
+      }
+    },
+    {
+      "id": "3ww3g4mjz",
+      "type": "text",
+      "x": 425.4403833349302,
+      "y": 300.5694469385642,
+      "data": {
+        "content": "event slug",
+        "fontSize": 16,
+        "color": "#C2622D",
+        "bold": false
+      },
+      "width": 100,
+      "height": 21
+    }
+  ]
+}
