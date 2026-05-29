@@ -1097,6 +1097,36 @@
     });
   }
 
+  // Ticket-page item selections are stored as positional indexes into the bulk/
+  // exact item arrays. When the item mix changes, a stored index can stop pointing
+  // at an item of the right type (e.g. a quantity selection now lands on a silent
+  // item) — that produced "selected … items were not created" warnings at apply
+  // time. Prune any index that doesn't resolve to an item of the matching type,
+  // and report what was dropped so the engine can log it.
+  function pruneTicketPageItemSelections(pages, typed) {
+    const validSets = {
+      quantityItemBulkIndexes: new Set((typed.bulkQuantityItems || []).map((i) => i.bulkIndex)),
+      quantityItemExactIndexes: new Set((typed.exactQuantityItems || []).map((i) => i.exactIndex)),
+      donationItemBulkIndexes: new Set((typed.bulkDonationItems || []).map((i) => i.bulkIndex)),
+      donationItemExactIndexes: new Set((typed.exactDonationItems || []).map((i) => i.exactIndex)),
+    };
+    const drops = [];
+    const prunedPages = (Array.isArray(pages) ? pages : []).map((page) => {
+      const next = { ...page };
+      for (const [field, valid] of Object.entries(validSets)) {
+        const current = Array.isArray(page[field]) ? page[field] : [];
+        const kept = current.filter((index) => valid.has(index));
+        const dropped = current.filter((index) => !valid.has(index));
+        if (dropped.length > 0) {
+          drops.push({ formName: page.formName || 'tix', field, indexes: dropped });
+        }
+        next[field] = kept;
+      }
+      return next;
+    });
+    return { pages: prunedPages, drops };
+  }
+
   function buildRecipe(config) {
     const safeSlug = slugifyForClickBid(config.basics.slug || config.basics.name);
     const eventSchedule = normalizeEventSchedule(config.basics);
@@ -1120,6 +1150,14 @@
     const exactDonationItems = exactItems
       .map((item, exactIndex) => ({ ...item, exactIndex }))
       .filter((item) => item.item_type_id === ITEM_TYPE_IDS.donation);
+    // Drop stale ticket-page item selections that no longer point at the right
+    // item type (prevents "selected items were not created" warnings at apply time).
+    const { pages: prunedTicketPages, drops: itemSelectionDrops } = pruneTicketPageItemSelections(
+      ticketPages.pages,
+      { bulkQuantityItems, exactQuantityItems, bulkDonationItems, exactDonationItems },
+    );
+    ticketPages.pages = prunedTicketPages;
+    ticketPages.itemSelectionDrops = itemSelectionDrops;
     const postCreateActivity = normalizePostCreateActivity(config.postCreateActivity, ticketPages);
     const envKey = ENVIRONMENTS[config.api.env] ? config.api.env : 'stage';
     const envPreset = ENVIRONMENTS[envKey];
@@ -1757,6 +1795,7 @@
     normalizeItemSection,
     normalizePostCreateActivity,
     normalizeTicketPages,
+    pruneTicketPageItemSelections,
     findUnsupportedTicketPurchasePayments,
     proxyToolUrl,
     randomEventName,

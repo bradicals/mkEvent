@@ -1023,6 +1023,84 @@ test('buildRecipe/export/import preserve ticket page config without credentials'
   assert.equal(imported.ticketPages.pages[0].selections[0].description, 'Plant-based entree');
 });
 
+test('pruneTicketPageItemSelections drops wrong-type and out-of-range indexes, keeps valid ones', () => {
+  const typed = {
+    bulkQuantityItems: [{ bulkIndex: 60 }, { bulkIndex: 61 }],
+    exactQuantityItems: [{ exactIndex: 0 }],
+    bulkDonationItems: [{ bulkIndex: 40 }],
+    exactDonationItems: [{ exactIndex: 1 }],
+  };
+  const pages = [{
+    formName: 'tix',
+    quantityItemBulkIndexes: [32, 33, 60, 61], // 32,33 are not quantity items
+    quantityItemExactIndexes: [0, 9],          // 9 out of range
+    donationItemBulkIndexes: [40, 7],          // 7 not a donation item
+    donationItemExactIndexes: [1],             // valid
+  }];
+
+  const { pages: pruned, drops } = model.pruneTicketPageItemSelections(pages, typed);
+
+  assert.deepEqual(pruned[0].quantityItemBulkIndexes, [60, 61]);
+  assert.deepEqual(pruned[0].quantityItemExactIndexes, [0]);
+  assert.deepEqual(pruned[0].donationItemBulkIndexes, [40]);
+  assert.deepEqual(pruned[0].donationItemExactIndexes, [1]);
+
+  // drops record what was removed, per page/field
+  const qb = drops.find((d) => d.field === 'quantityItemBulkIndexes');
+  assert.deepEqual(qb.indexes, [32, 33]);
+  assert.equal(qb.formName, 'tix');
+  assert.ok(drops.some((d) => d.field === 'quantityItemExactIndexes' && d.indexes.join() === '9'));
+  assert.ok(drops.some((d) => d.field === 'donationItemBulkIndexes' && d.indexes.join() === '7'));
+});
+
+test('pruneTicketPageItemSelections is a no-op (empty drops) when all selections are valid', () => {
+  const typed = {
+    bulkQuantityItems: [{ bulkIndex: 1 }, { bulkIndex: 2 }],
+    exactQuantityItems: [{ exactIndex: 0 }],
+    bulkDonationItems: [{ bulkIndex: 0 }],
+    exactDonationItems: [{ exactIndex: 1 }],
+  };
+  const pages = [{
+    formName: 'tix',
+    quantityItemBulkIndexes: [1, 2],
+    quantityItemExactIndexes: [0],
+    donationItemBulkIndexes: [0],
+    donationItemExactIndexes: [1],
+  }];
+  const { pages: pruned, drops } = model.pruneTicketPageItemSelections(pages, typed);
+  assert.deepEqual(drops, []);
+  assert.deepEqual(pruned[0].quantityItemBulkIndexes, [1, 2]);
+});
+
+test('buildRecipe prunes stale quantity selections and records itemSelectionDrops', () => {
+  const recipe = model.buildRecipe({
+    ...model.DEFAULT_CONFIG,
+    basics: { ...model.DEFAULT_CONFIG.basics, startDate: '2026-06-01', endDate: '2026-06-02', onCallDate: '2026-06-02' },
+    items: {
+      activeTab: 'bulk',
+      // bulk order: silent, live, donation, quantity -> quantity occupies the LAST 2 indexes (2,3)
+      bulk: { ...model.DEFAULT_CONFIG.items.bulk, silentCount: 2, liveCount: 0, donationCount: 0, quantityCount: 2, startNum: 1 },
+      exact: { records: [] },
+    },
+    ticketPages: {
+      enabled: true,
+      preset: 'custom',
+      pages: [{
+        ...model.DEFAULT_CONFIG.ticketPages.pages[0],
+        quantityItemBulkIndexes: [0, 2, 3], // 0 is a silent item (stale); 2,3 are quantity
+        quantityItemExactIndexes: [],
+        donationItemBulkIndexes: [],
+        donationItemExactIndexes: [],
+      }],
+    },
+  });
+
+  assert.deepEqual(recipe.ticketPages.pages[0].quantityItemBulkIndexes, [2, 3]);
+  assert.ok(Array.isArray(recipe.ticketPages.itemSelectionDrops));
+  const drop = recipe.ticketPages.itemSelectionDrops.find((d) => d.field === 'quantityItemBulkIndexes');
+  assert.deepEqual(drop.indexes, [0]);
+});
+
 test('buildRecipe preserves bulk and exact item references for ticket pages', () => {
   const recipe = model.buildRecipe({
     ...model.DEFAULT_CONFIG,

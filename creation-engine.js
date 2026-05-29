@@ -664,6 +664,13 @@
     }
     const createdQuantityItems = buildCreatedQuantityItems(recipe, exactItemResults, createdItemsByNumber);
     const createdDonationItems = buildCreatedDonationItems(recipe, exactItemResults, createdItemsByNumber);
+    // Surface any ticket-page item selections that were pruned at build time
+    // because they no longer pointed at an item of the matching type.
+    const itemSelectionDrops = recipe.ticketPages?.itemSelectionDrops || [];
+    for (const drop of itemSelectionDrops) {
+      const kind = drop.field.replace('ItemBulkIndexes', ' (bulk)').replace('ItemExactIndexes', ' (exact)');
+      progress.info('ticket-pages', `Ignored ${drop.indexes.length} stale ${kind} selection(s) on ${drop.formName}: ${drop.indexes.join(', ')} (no longer that item type).`);
+    }
     const needsPostItemConfig = createdQuantityItems.length > 0 || createdDonationItems.length > 0 || hasTicketPageItemAttachments(recipe.ticketPages);
     if (needsPostItemConfig) {
       if (!config.api.adminEmail || !config.api.adminPassword) {
