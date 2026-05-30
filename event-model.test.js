@@ -1206,3 +1206,29 @@ test('browserFallbackApplyPostItemConfig posts to the proxy post-item endpoint',
     global.fetch = originalFetch;
   }
 });
+
+test('summarizeRecipe publicUrl reflects the primary ticket-page form name', () => {
+  const baseConfig = model.buildRecipe(model.DEFAULT_CONFIG);
+  // Ticket pages OFF -> URL is the event root (no path).
+  const offSummary = model.summarizeRecipe(baseConfig);
+  assert.ok(/^https:\/\/[^/]+$/.test(offSummary.publicUrl), `expected root URL, got ${offSummary.publicUrl}`);
+
+  // Ticket pages ON with a custom form name -> URL carries the form name.
+  const withPages = model.buildRecipe({
+    ...model.DEFAULT_CONFIG,
+    api: { ...model.DEFAULT_CONFIG.api, env: 'stage', baseUrl: 'https://cbo.bid' },
+    basics: { ...model.DEFAULT_CONFIG.basics, slug: 'qa1234' },
+    ticketPages: { enabled: true, preset: 'basic', pages: [{ formName: 'gala-dinner', displayName: 'Gala' }] },
+  });
+  const onSummary = model.summarizeRecipe(withPages);
+  assert.equal(onSummary.publicUrl, 'https://qa1234.cbo.bid/gala-dinner');
+
+  // Ticket pages ON but default 'tix' form name -> still collapses to root.
+  const withDefault = model.buildRecipe({
+    ...model.DEFAULT_CONFIG,
+    api: { ...model.DEFAULT_CONFIG.api, env: 'stage', baseUrl: 'https://cbo.bid' },
+    basics: { ...model.DEFAULT_CONFIG.basics, slug: 'qa1234' },
+    ticketPages: { enabled: true, preset: 'basic', pages: [{ formName: 'tix', displayName: 'Tickets' }] },
+  });
+  assert.equal(model.summarizeRecipe(withDefault).publicUrl, 'https://qa1234.cbo.bid');
+});
