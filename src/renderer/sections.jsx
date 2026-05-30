@@ -684,8 +684,11 @@ export function TicketPagesBody({ data, items, set, basics = {}, api = {} }) {
   const ticketPages = MODEL.normalizeTicketPages(data);
   const page = ticketPages.pages[0] || MODEL.DEFAULT_CONFIG.ticketPages.pages[0];
   const previewSlug = MODEL.slugifyForClickBid(basics.slug || basics.name || '');
+  // Mirror summarizeRecipe: only the form name of an ENABLED ticket page shapes
+  // the public URL, so the preview never diverges from the footer/admin URL.
+  const previewFormName = ticketPages.enabled ? page.formName : '';
   const previewUrl = previewSlug && api.baseUrl
-    ? MODEL.buildPublicEventUrl(api.baseUrl, previewSlug, page.formName)
+    ? MODEL.buildPublicEventUrl(api.baseUrl, previewSlug, previewFormName)
     : '';
   const disabledStyle = { opacity: ticketPages.enabled ? 1 : 0.45, pointerEvents: ticketPages.enabled ? 'auto' : 'none' };
   const [answerDrafts, setAnswerDrafts] = useState({});

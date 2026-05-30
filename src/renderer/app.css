@@ -488,3 +488,4 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-brand-prim
 .ticket-url-preview .muted {
   color: #94a3b8;
 }
+.app-foot .summary .summary-url { color: #2563eb; }
