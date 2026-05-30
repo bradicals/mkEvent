@@ -227,6 +227,12 @@ function AppFoot({ cfg, recipe, summary, slugCheck, onCreate }) {
         <span><strong>{summary.itemCount}</strong> items ({summary.itemBreakdown.silent}S · {summary.itemBreakdown.live}L · {summary.itemBreakdown.donation}D · {summary.itemBreakdown.quantity}Q)</span>
         <span className="dot-sep">·</span>
         <span><strong>{summary.ticketPages.enabled ? summary.ticketPages.pageCount : 0}</strong> ticket pages</span>
+        {summary.publicUrl && (
+          <>
+            <span className="dot-sep">·</span>
+            <span className="summary-url" title={summary.publicUrl}>{summary.publicUrl.replace(/^https?:\/\//, '')}</span>
+          </>
+        )}
       </div>
       <div className="grow"></div>
       <button className="btn btn-lime btn-lg" disabled={!canCreate} onClick={onCreate} title={!canCreate ? (slugBlocked ? 'Choose an available event keyword before creating the event.' : 'Enter event basics, contact info, organization ID, and org token first.') : 'Create event'}>
