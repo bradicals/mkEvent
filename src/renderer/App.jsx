@@ -508,7 +508,7 @@ function App() {
         </Section>
 
         <Section icon="fa-ticket" title="Ticket pages" sub="Quick setup for ticket forms, ticket types, selections, and questions." summary={ticketPagesSummary(cfg.ticketPages)}>
-          <TicketPagesBody data={cfg.ticketPages} items={cfg.items} set={set('ticketPages')} />
+          <TicketPagesBody data={cfg.ticketPages} items={cfg.items} set={set('ticketPages')} basics={cfg.basics} api={cfg.api} />
         </Section>
 
         <Section icon="fa-cart-shopping" title="Post-create activity" sub="Optional public checkout seeding for guest and sales data." summary={postCreateActivitySummary(cfg.postCreateActivity, cfg.ticketPages)}>

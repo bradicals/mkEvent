@@ -474,3 +474,17 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-brand-prim
 @media (max-width: 640px) {
   .settings-aside { max-width: 100%; }
 }
+.ticket-url-preview {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #475569;
+}
+.ticket-url-preview code {
+  background: #f1f5f9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #043059;
+}
+.ticket-url-preview .muted {
+  color: #94a3b8;
+}
