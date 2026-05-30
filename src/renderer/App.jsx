@@ -326,7 +326,7 @@ function App() {
 
   useEffect(() => {
     if (!showSettings) return undefined;
-    const onKeyDown = (event) => { if (event.key === 'Escape') setShowSettings(false); };
+    const onKeyDown = (event) => { if (event.key === 'Escape') closeSettings(); };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [showSettings]);
