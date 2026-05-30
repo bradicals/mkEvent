@@ -330,6 +330,15 @@ function App() {
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [showSettings]);
+
+  // Lock background scroll while the settings drawer or the run modal is open.
+  const overlayOpen = showSettings || Boolean(runRequest);
+  useEffect(() => {
+    if (!overlayOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, [overlayOpen]);
   const importInputRef = useRef(null);
   const recipe = useMemo(() => EVENT_MODEL.buildRecipe(cfg), [cfg]);
   const summary = useMemo(() => EVENT_MODEL.summarizeRecipe(recipe), [recipe]);
