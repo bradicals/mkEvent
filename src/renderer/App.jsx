@@ -298,8 +298,6 @@ function postCreateActivitySummary(postCreateActivity, ticketPages) {
     {activity.ticketPurchases.addDonation && <span className="pill">+ donation</span>}
   </>;
 }
-function settingsSummary(api) { return <><span className="pill">{api.apiBaseUrl ? 'API URL set' : 'API URL needed'}</span><span className="pill">{api.orgToken ? 'org token set' : 'org token needed'}</span></>; }
-
 function cloneData(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -313,6 +311,7 @@ function App() {
   const [testError, setTestError] = useState('');
   const [slugCheck, setSlugCheck] = useState({ state: 'idle', slug: '', message: '' });
   const [showSettings, setShowSettings] = useState(false);
+  const closeSettings = () => setShowSettings(false);
   useEffect(() => { setTestState('idle'); setTestError(''); },
     [cfg.api.env, cfg.api.organizationId, cfg.api.orgToken, cfg.api.baseUrl]);
   useEffect(() => { setSlugCheck({ state: 'idle', slug: '', message: '' }); },
@@ -533,11 +532,11 @@ function App() {
       )}
       {showSettings && (
         <>
-          <div className="settings-backdrop" onClick={() => setShowSettings(false)} />
+          <div className="settings-backdrop" onClick={closeSettings} />
           <aside className="settings-aside" role="dialog" aria-label="Settings">
             <div className="settings-aside-head">
               <h2>Settings</h2>
-              <button className="btn btn-ghost btn-sm" onClick={() => setShowSettings(false)} aria-label="Close settings"><i className="fa-solid fa-xmark"></i></button>
+              <button className="btn btn-ghost btn-sm" onClick={closeSettings} aria-label="Close settings"><i className="fa-solid fa-xmark"></i></button>
             </div>
             <div className="settings-aside-body">
               <SettingsBody
