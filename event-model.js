@@ -1611,7 +1611,11 @@
           : 0,
       },
       adminUrl: `${trimTrailingSlash(recipe.environment.baseUrl || recipe.environment.adminBaseUrl)}/events/${recipe.event.slug}`,
-      publicUrl: buildPublicEventUrl(recipe.environment.baseUrl || recipe.environment.publicBaseUrl, recipe.event.slug),
+      publicUrl: buildPublicEventUrl(
+        recipe.environment.baseUrl || recipe.environment.publicBaseUrl,
+        recipe.event.slug,
+        ticketPages.enabled && ticketPages.pages[0] ? ticketPages.pages[0].formName : '',
+      ),
     };
   }
 
