@@ -32,7 +32,8 @@
       { "from": "ms-playwright", "to": "ms-playwright" }
     ],
     "win": {
-      "target": ["nsis"]
+      "target": ["nsis"],
+      "icon": "assets/icon.ico"
     },
     "nsis": {
       "oneClick": false,
