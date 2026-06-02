@@ -59,6 +59,9 @@ function makeRunBrowserFallback(log) {
       }
 
       const env = { ...process.env, ELECTRON_RUN_AS_NODE: '1' };
+      // Give the fallback a real, writable place for failure screenshots
+      // instead of its hardcoded default.
+      try { env.MKEVENT_LOG_DIR = path.join(app.getPath('userData'), 'logs'); } catch (_) {}
       if (app.isPackaged) {
         env.PLAYWRIGHT_BROWSERS_PATH = path.join(process.resourcesPath, 'ms-playwright');
       }

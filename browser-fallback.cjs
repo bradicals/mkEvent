@@ -2915,12 +2915,13 @@ async function createEventViaAdmin(payload) {
     };
   } catch (err) {
     // Screenshot on failure for diagnostics
-    const logDir = '/home/bradley/mkEvent/logs';
+    const pathMod = require('path');
+    const logDir = process.env.MKEVENT_LOG_DIR || pathMod.join(require('os').tmpdir(), 'mkEvent-logs');
     try {
       const fs = require('fs');
       if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
       const ts = new Date().toISOString().replace(/[:.]/g, '-');
-      const screenshotPath = `${logDir}/fallback-failure-${ts}.png`;
+      const screenshotPath = pathMod.join(logDir, `fallback-failure-${ts}.png`);
       await page.screenshot({ path: screenshotPath, fullPage: true });
       process.stderr.write(`\n[Screenshot saved: ${screenshotPath}]\n`);
     } catch (_) {

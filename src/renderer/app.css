@@ -311,7 +311,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-brand-prim
 .run-result-card div { color: #e2e8f0; word-break: break-word; }
 .run-result-card-wide { grid-column: 1 / -1; }
 .run-foot { display: flex; gap: 8px; padding: 14px 20px; border-top: 1px solid rgba(255,255,255,0.08); align-items: center; }
-.run-foot .left { color: #94a3b8; font-size: 12px; flex: 1; }
+.run-foot .left { color: #94a3b8; font-size: 12px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.run-foot .btn { flex-shrink: 0; }
 
 /* Layout B specific */
 .layout-b { display: grid; grid-template-columns: 280px 1fr; gap: 24px; max-width: 1340px; margin: 0 auto; padding: 28px 32px 96px; }
