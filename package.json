@@ -15,7 +15,9 @@
   "build": {
     "appId": "io.cbo.mkevent",
     "productName": "mkEvent",
-    "directories": { "output": "release" },
+    "directories": {
+      "output": "release"
+    },
     "files": [
       "dist/**/*",
       "src/main/**/*",
@@ -30,10 +32,15 @@
       "node_modules/@faker-js/**"
     ],
     "extraResources": [
-      { "from": "ms-playwright", "to": "ms-playwright" }
+      {
+        "from": "ms-playwright",
+        "to": "ms-playwright"
+      }
     ],
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "assets/icon.ico"
     },
     "nsis": {
@@ -48,7 +55,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@faker-js/faker": "^10.4.0",
+    "@faker-js/faker": "^8.4.1",
     "playwright": "^1.59.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

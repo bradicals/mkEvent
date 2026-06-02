@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog } = require('electron');
+const { app, BrowserWindow, dialog, screen } = require('electron');
 const path = require('path');
 const { startProxy, stopProxy, getProxyState } = require('./proxy-manager.cjs');
 
@@ -17,11 +17,20 @@ function getRendererEntry() {
 
 function createWindow() {
   const preloadPath = path.join(__dirname, '..', 'preload', 'index.cjs');
+
+  // Clamp the initial size to the current display's work area so the window
+  // never opens larger than the screen (e.g. small Windows Sandbox displays),
+  // which would push the sticky footer off-screen and make it unresizable.
+  const workArea = screen.getPrimaryDisplay().workAreaSize;
+  const width = Math.min(1480, workArea.width);
+  const height = Math.min(980, workArea.height);
+
   const window = new BrowserWindow({
-    width: 1480,
-    height: 980,
-    minWidth: 1180,
-    minHeight: 820,
+    width,
+    height,
+    minWidth: 760,
+    minHeight: 560,
+    resizable: true,
     backgroundColor: '#f6f8fb',
     title: 'mkEvent',
     webPreferences: {
