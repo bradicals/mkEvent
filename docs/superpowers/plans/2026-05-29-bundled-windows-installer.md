@@ -1002,3 +1002,33 @@ git commit -m "docs: Windows end-user install steps + SmartScreen guidance"
 - **Placeholder scan:** no TBD/TODO; every code and command step contains complete content.
 - **Type/contract consistency:** `startProxyServer(options)`, `createProxyServer(options)`, `runBrowserFallback(payload)`, `runSmokeCheck({resultPath})`, and the `{status,headers,body}` / `{ok,error,message}` envelopes are used identically across module, manager, smoke-check, and tests. `PLAYWRIGHT_BROWSERS_PATH` = `resources/ms-playwright` is set consistently in `index.cjs` and `proxy-manager.cjs` and matches the `extraResources` target. `--smoke-check` / `--smoke-result=` flags are produced by `run-smoke.ps1` and consumed by `index.cjs`.
 ```
+
+---
+
+## Amendment 2026-06-01: preserve the Copy debug report feature
+
+After this plan was written, the "Copy debug report" feature shipped (see
+`docs/superpowers/specs/2026-06-01-copy-debug-report-design.md`). It adds a
+`GET /debug/logs?lines=N` route to the **Python** proxy and the renderer's
+"Copy debug report" button fetches it via
+`EventModel.proxyToolUrl(config.api.proxyUrl, '/debug/logs?lines=500')`.
+
+The in-process Node proxy in Task 1 must therefore also serve `GET /debug/logs`,
+or the button regresses to "Proxy log: UNAVAILABLE" once Python is dropped.
+Reconciliation folded into execution:
+
+- **Task 1 (`proxy-server.cjs`):** add a module-level `tailLines(filePath, n)`
+  helper and a `GET /debug/logs?lines=N` route (default 500, clamped to 5000)
+  that returns `{ logPath, returned, lines }` — the same shape the Python proxy
+  returns. The log file path is injected via `options.logPath` (the pure module
+  stays Electron-free and testable). When no `logPath`/file, return
+  `{ logPath: null, returned: 0, lines: [] }` with HTTP 200. Add unit tests for
+  `tailLines` and the route. Export `tailLines`.
+- **Task 2 (`proxy-manager.cjs`):** `makeFileLogger()` returns
+  `{ logger, logPath }`; pass `logPath` into `startProxyServer(...)` so
+  `/debug/logs` tails the same file the logger writes. Additionally, after the
+  fallback child closes, log `browser_fallback_exit` with `returncode` and
+  `stdout`/`stderr` trimmed to 20000 chars — this is the high-value content the
+  debug report surfaced for hard bugs, and the Python proxy logged it too.
+
+Everything else in the plan is unchanged.
