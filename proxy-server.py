@@ -21,7 +21,7 @@ import sys
 import urllib.request
 import urllib.error
 from http.server import HTTPServer, ThreadingHTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, parse_qs
 
 DEFAULT_PORT = 9999
 DEFAULT_HOST = "127.0.0.1"
@@ -76,6 +76,26 @@ def _log_debug(event, **fields):
     _ensure_log_dir()
     with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as handle:
         handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
+def tail_lines(path, n):
+    """Return the last n non-trailing-blank lines of a UTF-8 text file.
+
+    Missing file or n <= 0 yields an empty list. Lines are returned without
+    their trailing newline. Reads the whole file (the proxy log stays small);
+    callers clamp n upstream.
+    """
+    if n <= 0:
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            raw = handle.read()
+    except FileNotFoundError:
+        return []
+    lines = raw.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    return lines[-n:]
 
 
 def _is_host_allowed(url_str, allowlist):
@@ -188,8 +208,8 @@ def _run_browser_fallback(payload):
     _log_debug(
         "browser_fallback_exit",
         returncode=proc.returncode,
-        stdout=_trim_text(proc.stdout or ""),
-        stderr=_trim_text(proc.stderr or ""),
+        stdout=_trim_text(proc.stdout or "", limit=20000),
+        stderr=_trim_text(proc.stderr or "", limit=20000),
     )
 
     if proc.returncode != 0:
@@ -207,6 +227,26 @@ class ProxyHandler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         """CORS preflight."""
         self._send_json(204, {"ok": True})
+
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        if parsed.path != "/debug/logs":
+            self._send_json_error(404, "Only GET /debug/logs is supported")
+            return
+
+        params = parse_qs(parsed.query)
+        try:
+            requested = int(params.get("lines", ["500"])[0])
+        except (TypeError, ValueError):
+            requested = 500
+        count = max(0, min(requested, 5000))
+
+        lines = tail_lines(DEBUG_LOG_PATH, count)
+        self._send_json(200, {
+            "logPath": DEBUG_LOG_PATH,
+            "returned": len(lines),
+            "lines": lines,
+        })
 
     def do_POST(self):
         if self.path == "/fallback/create-event":
@@ -386,7 +426,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
 
     def _cors_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
     def log_message(self, format, *args):
