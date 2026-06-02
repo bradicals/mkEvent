@@ -1,0 +1,23 @@
+<Configuration>
+  <Networking>Enable</Networking>
+  <MappedFolders>
+    <MappedFolder>
+      <HostFolder>C:\Users\Bradley\Desktop\mkEvent\release</HostFolder>
+      <SandboxFolder>C:\mkEventInstaller</SandboxFolder>
+      <ReadOnly>true</ReadOnly>
+    </MappedFolder>
+    <MappedFolder>
+      <HostFolder>C:\Users\Bradley\Desktop\mkEvent\sandbox\results</HostFolder>
+      <SandboxFolder>C:\mkEventResults</SandboxFolder>
+      <ReadOnly>false</ReadOnly>
+    </MappedFolder>
+    <MappedFolder>
+      <HostFolder>C:\Users\Bradley\Desktop\mkEvent\sandbox</HostFolder>
+      <SandboxFolder>C:\mkEventScripts</SandboxFolder>
+      <ReadOnly>true</ReadOnly>
+    </MappedFolder>
+  </MappedFolders>
+  <LogonCommand>
+    <Command>powershell.exe -ExecutionPolicy Bypass -NoProfile -File C:\mkEventScripts\run-smoke.ps1</Command>
+  </LogonCommand>
+</Configuration>
