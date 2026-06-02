@@ -78,6 +78,26 @@ def _log_debug(event, **fields):
         handle.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
+def tail_lines(path, n):
+    """Return the last n non-trailing-blank lines of a UTF-8 text file.
+
+    Missing file or n <= 0 yields an empty list. Lines are returned without
+    their trailing newline. Reads the whole file (the proxy log stays small);
+    callers clamp n upstream.
+    """
+    if n <= 0:
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            raw = handle.read()
+    except FileNotFoundError:
+        return []
+    lines = raw.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    return lines[-n:]
+
+
 def _is_host_allowed(url_str, allowlist):
     """Return (True, hostname) if the URL's host is in the allowlist, else (False, hostname)."""
     try:
