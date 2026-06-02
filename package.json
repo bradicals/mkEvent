@@ -24,7 +24,12 @@
       "package.json"
     ],
     "asarUnpack": [
-      "browser-fallback.cjs"
+      "browser-fallback.cjs",
+      "node_modules/playwright/**",
+      "node_modules/playwright-core/**"
+    ],
+    "extraResources": [
+      { "from": "ms-playwright", "to": "ms-playwright" }
     ],
     "win": {
       "target": ["nsis"]
