@@ -208,8 +208,8 @@ def _run_browser_fallback(payload):
     _log_debug(
         "browser_fallback_exit",
         returncode=proc.returncode,
-        stdout=_trim_text(proc.stdout or ""),
-        stderr=_trim_text(proc.stderr or ""),
+        stdout=_trim_text(proc.stdout or "", limit=20000),
+        stderr=_trim_text(proc.stderr or "", limit=20000),
     )
 
     if proc.returncode != 0:
