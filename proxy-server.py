@@ -21,7 +21,7 @@ import sys
 import urllib.request
 import urllib.error
 from http.server import HTTPServer, ThreadingHTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, parse_qs
 
 DEFAULT_PORT = 9999
 DEFAULT_HOST = "127.0.0.1"
@@ -228,6 +228,26 @@ class ProxyHandler(BaseHTTPRequestHandler):
         """CORS preflight."""
         self._send_json(204, {"ok": True})
 
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        if parsed.path != "/debug/logs":
+            self._send_json_error(404, "Only GET /debug/logs is supported")
+            return
+
+        params = parse_qs(parsed.query)
+        try:
+            requested = int(params.get("lines", ["500"])[0])
+        except (TypeError, ValueError):
+            requested = 500
+        count = max(0, min(requested, 5000))
+
+        lines = tail_lines(DEBUG_LOG_PATH, count)
+        self._send_json(200, {
+            "logPath": DEBUG_LOG_PATH,
+            "returned": len(lines),
+            "lines": lines,
+        })
+
     def do_POST(self):
         if self.path == "/fallback/create-event":
             self._handle_browser_fallback_create_event()
@@ -406,7 +426,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
 
     def _cors_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
     def log_message(self, format, *args):
