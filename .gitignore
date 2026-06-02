@@ -1,0 +1,8 @@
+node_modules/
+dist/
+release/
+ms-playwright/
+sandbox/results/
+
+# Windows "Zone.Identifier" files (NTFS alternate data streams from Internet downloads)
+*:Zone.Identifier

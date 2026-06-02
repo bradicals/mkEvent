@@ -1,0 +1,55 @@
+{
+  "name": "mkevent",
+  "version": "1.0.0",
+  "description": "QA ClickBid event creator",
+  "main": "src/main/index.cjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test",
+    "electron:dev": "node scripts/electron-dev.mjs",
+    "electron:start": "npm run build && electron .",
+    "dist:win": "npm run build && electron-builder --win"
+  },
+  "build": {
+    "appId": "io.cbo.mkevent",
+    "productName": "mkEvent",
+    "directories": { "output": "release" },
+    "files": [
+      "dist/**/*",
+      "src/main/**/*",
+      "src/preload/**/*",
+      "browser-fallback.cjs",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "browser-fallback.cjs"
+    ],
+    "win": {
+      "target": ["nsis"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "publish": null
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@faker-js/faker": "^10.4.0",
+    "playwright": "^1.59.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.7.0",
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3",
+    "vite": "^5.4.19"
+  }
+}
