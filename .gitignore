@@ -4,5 +4,7 @@ release/
 ms-playwright/
 sandbox/results/
 
-# Windows "Zone.Identifier" files (NTFS alternate data streams from Internet downloads)
-*:Zone.Identifier
+# Windows "Zone.Identifier" files (NTFS alternate data streams from Internet
+# downloads). Pattern has no colon so it also catches the U+F03A look-alike
+# variant a cross-platform checkout can produce.
+*Zone.Identifier
