@@ -2,11 +2,7 @@
 
 Personal QA tool for creating ClickBid events with repeatable setup.
 
-`mkEvent` is a QA event creator that now has two runnable shells:
-- the legacy browser flow
-- an Electron desktop proof of concept
-
-It lets QA create:
+`mkEvent` is an Electron desktop app that lets QA create:
 - a base event
 - seeded bidders
 - seeded items
@@ -28,20 +24,12 @@ mkEvent ships as a single Windows installer — **no Node, Python, or other setu
    (and admin email/password if you use the browser fallback). These are stored
    locally on your machine only.
 
-## Current Runtime Modes
-
-- Legacy browser entry: [mkEvent.html](/home/bradley/mkEvent/mkEvent.html)
-- Vite/module renderer: [index.html](/home/bradley/mkEvent/index.html)
-- Electron desktop shell: [src/main/index.cjs](/home/bradley/mkEvent/src/main/index.cjs)
-
 ## How It Works
 
-- The UI is loaded directly from [mkEvent.html](/home/bradley/mkEvent/mkEvent.html).
-- The Vite renderer lives in [src/renderer](/home/bradley/mkEvent/src/renderer).
-- In the legacy browser flow, API calls go through the local Python proxy in [proxy-server.py](/home/bradley/mkEvent/proxy-server.py).
-- The packaged desktop app instead runs an **in-process Node proxy** (`src/main/proxy-server.cjs`) on the same `127.0.0.1:9999` contract — no Python required.
-- When normal API creation is unavailable, mkEvent uses the Playwright-based admin/browser fallback in [browser-fallback.cjs](/home/bradley/mkEvent/browser-fallback.cjs). The installer bundles Chromium so this works with no separate Playwright install.
-- The Electron app auto-starts the in-process proxy when the desktop shell launches.
+- The Electron main process (`src/main/index.cjs`) auto-starts an **in-process Node proxy** (`src/main/proxy-server.cjs`) on `127.0.0.1:9999`, then opens the window.
+- The renderer is a Vite/React app under `src/renderer` (entry `index.html` → `src/renderer/main.jsx`). It talks to ClickBid through the local proxy to avoid CORS and to restrict requests to approved ClickBid hosts.
+- Shared logic (`event-model.js`, `creation-engine.js`, `item-library.js`) lives at the repo root as global-script modules and is consumed by the renderer through thin ESM shims in `src/shared`.
+- When normal API creation is unavailable, mkEvent uses the Playwright-based admin/browser fallback in `browser-fallback.cjs`, spawned by the proxy manager. The installer bundles Chromium so this works with no separate Playwright install.
 
 ## Requirements
 
@@ -58,8 +46,7 @@ Nothing else — the installer bundles the runtime and Chromium.
 To work on the source (not needed to run the installed app):
 
 - Node.js
-- Python 3 (only for the legacy browser flow; the packaged desktop app no longer uses it)
-- Playwright installed via `npm install`
+- Playwright's Chromium installed via `npm install` (used by the admin fallback)
 
 ## Setup
 
@@ -69,32 +56,21 @@ Install dependencies:
 npm install
 ```
 
-Start the local proxy:
-
-```bash
-python3 proxy-server.py
-```
-
-Open the legacy app:
-
-- Open [mkEvent.html](/home/bradley/mkEvent/mkEvent.html) in a browser.
-
-Run the Vite migration path:
+Run the renderer alone in the browser (UI work, no Electron shell):
 
 ```bash
 npm run dev
 ```
 
 - Then open the local Vite URL, typically `http://127.0.0.1:5173`.
-- This is the in-progress module-based renderer that will replace the legacy HTML entry.
 
-Run the Electron desktop POC in dev mode:
+Run the Electron desktop app in dev mode (starts the in-process proxy + window):
 
 ```bash
 npm run electron:dev
 ```
 
-Run the Electron desktop POC against a built renderer:
+Run the Electron app against a production-built renderer:
 
 ```bash
 npm run electron:start
@@ -120,34 +96,34 @@ npm test
 
 ## Main Files
 
-- [mkEvent.html](/home/bradley/mkEvent/mkEvent.html): browser entrypoint
-- [app.jsx](/home/bradley/mkEvent/app.jsx): top-level app state and orchestration
-- [sections.jsx](/home/bradley/mkEvent/sections.jsx): UI sections and form editors
-- [create-runner.jsx](/home/bradley/mkEvent/create-runner.jsx): run modal and progress display
-- [event-model.js](/home/bradley/mkEvent/event-model.js): config defaults, normalization, recipe build/import/export
-- [creation-engine.js](/home/bradley/mkEvent/creation-engine.js): API-first creation pipeline and fallback decision logic
-- [browser-fallback.cjs](/home/bradley/mkEvent/browser-fallback.cjs): Playwright admin automation
-- [proxy-server.py](/home/bradley/mkEvent/proxy-server.py): local CORS proxy and fallback launcher
-- [src/main/index.cjs](/home/bradley/mkEvent/src/main/index.cjs): Electron main process
-- [src/main/proxy-manager.cjs](/home/bradley/mkEvent/src/main/proxy-manager.cjs): desktop proxy lifecycle
-- [src/preload/index.cjs](/home/bradley/mkEvent/src/preload/index.cjs): Electron preload bridge
+- `src/main/index.cjs`: Electron main process (boots the proxy, opens the window, `--smoke-check`)
+- `src/main/proxy-manager.cjs`: in-process proxy lifecycle + browser-fallback runner
+- `src/main/proxy-server.cjs`: the Node CORS proxy (host-allowlisted forward + fallback routes)
+- `src/preload/index.cjs`: Electron preload bridge
+- `index.html` → `src/renderer/main.jsx`: renderer entry
+- `src/renderer/App.jsx`: top-level app state and orchestration
+- `src/renderer/sections.jsx`: UI sections and form editors
+- `src/renderer/create-runner.jsx`: run modal and progress display
+- `src/shared/*.js`: ESM shims that expose the root global-script modules to the renderer
+- `event-model.js`: config defaults, normalization, recipe build/import/export
+- `creation-engine.js`: API-first creation pipeline and fallback decision logic
+- `browser-fallback.cjs`: Playwright admin automation
 
 ## Architecture
 
 High-level flow:
 
-1. The browser loads [mkEvent.html](/home/bradley/mkEvent/mkEvent.html), which pulls in the app scripts directly.
-2. [app.jsx](/home/bradley/mkEvent/app.jsx) owns the main config state, environment switching, import/export, slug checks, and create action.
-3. [sections.jsx](/home/bradley/mkEvent/sections.jsx) renders the editor UI for API settings, event basics, bidders, items, auction settings, and ticket pages.
-4. [event-model.js](/home/bradley/mkEvent/event-model.js) normalizes UI state and builds a stable recipe object for creation.
-5. [creation-engine.js](/home/bradley/mkEvent/creation-engine.js) runs the creation pipeline:
+1. `src/renderer/App.jsx` owns the main config state, environment switching, import/export, slug checks, and create action.
+2. `src/renderer/sections.jsx` renders the editor UI for API settings, event basics, bidders, items, auction settings, and ticket pages.
+3. `event-model.js` normalizes UI state and builds a stable recipe object for creation.
+4. `creation-engine.js` runs the creation pipeline:
    - validate slug
    - create event
    - create bidders
    - create items
    - verify seeded counts
-6. Browser-side HTTP calls go through [proxy-server.py](/home/bradley/mkEvent/proxy-server.py) to avoid CORS issues and restrict requests to approved ClickBid hosts.
-7. If event creation needs the admin flow, [proxy-server.py](/home/bradley/mkEvent/proxy-server.py) launches [browser-fallback.cjs](/home/bradley/mkEvent/browser-fallback.cjs), which uses Playwright to log into ClickBid admin and drive the same AJAX endpoints used by the real admin UI.
+5. HTTP calls go through the in-process Node proxy (`src/main/proxy-server.cjs`) to avoid CORS issues and restrict requests to approved ClickBid hosts.
+6. If event creation needs the admin flow, the proxy manager launches `browser-fallback.cjs`, which uses Playwright to log into ClickBid admin and drive the same AJAX endpoints used by the real admin UI.
 
 Data model split:
 
@@ -162,10 +138,10 @@ Execution split:
 
 Ticket page path:
 
-- Ticket page config is modeled in [event-model.js](/home/bradley/mkEvent/event-model.js)
-- Edited in [sections.jsx](/home/bradley/mkEvent/sections.jsx)
-- Passed through [creation-engine.js](/home/bradley/mkEvent/creation-engine.js)
-- Applied in [browser-fallback.cjs](/home/bradley/mkEvent/browser-fallback.cjs)
+- Ticket page config is modeled in `event-model.js`
+- Edited in `src/renderer/sections.jsx`
+- Passed through `creation-engine.js`
+- Applied in `browser-fallback.cjs`
 
 ## Environment Notes
 
@@ -202,13 +178,15 @@ Page-level custom questions are still not wired.
 
 ## Logging and Troubleshooting
 
-- Proxy/fallback logs are written to [logs/mkEvent-proxy.log](/home/bradley/mkEvent/logs/mkEvent-proxy.log).
-- Browser fallback failures also try to save a screenshot under `/home/bradley/mkEvent/logs/`.
-- If the UI is already open after code changes, reload the page.
+- The proxy log is written to `mkEvent-proxy.log` in the app's userData dir
+  (`%APPDATA%\mkEvent` on Windows). The run modal's **Copy debug report** button
+  bundles the UI transcript + proxy log for troubleshooting.
+- Browser fallback failures also try to save a screenshot under the app's
+  `logs` folder (`%APPDATA%\mkEvent\logs`), or the OS temp dir as a fallback.
 
 Common issues:
 
 - Missing org token: API validation and creation will fail.
 - Missing admin credentials: browser fallback cannot launch.
-- Proxy not running: browser requests to ClickBid will fail.
-- Open app tab is stale: reload after local JS changes.
+- Hitting the ClickBid active-event cap (e.g. 40) fails creation server-side —
+  archive old events in the ClickBid admin to free slots.
