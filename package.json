@@ -10,7 +10,8 @@
     "test": "node --test",
     "electron:dev": "node scripts/electron-dev.mjs",
     "electron:start": "npm run build && electron .",
-    "dist:win": "npm run build && electron-builder --win"
+    "dist:win": "npm run build && electron-builder --win",
+    "release:win": "npm run build && electron-builder --win --publish always"
   },
   "build": {
     "appId": "io.cbo.mkevent",
@@ -48,7 +49,13 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true
     },
-    "publish": null
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "bradicals",
+        "repo": "mkEvent"
+      }
+    ]
   },
   "keywords": [],
   "author": "",
@@ -56,6 +63,7 @@
   "type": "commonjs",
   "dependencies": {
     "@faker-js/faker": "^8.4.1",
+    "electron-updater": "^6.8.3",
     "playwright": "^1.59.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

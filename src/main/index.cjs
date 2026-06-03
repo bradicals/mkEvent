@@ -74,7 +74,12 @@ async function boot() {
     }).catch(() => undefined);
   }
 
-  createWindow();
+  const window = createWindow();
+
+  // Auto-update only in packaged builds (dev has no app-update.yml feed).
+  if (app.isPackaged) {
+    require('./updater.cjs').initAutoUpdater(() => window);
+  }
 }
 
 app.whenReady().then(boot);
