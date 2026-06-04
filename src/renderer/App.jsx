@@ -189,6 +189,60 @@ function PresetPicker({ presets, selectedPresetId, onSelectPreset }) {
   );
 }
 
+function PresetNameModal({ initialName, onSave, onCancel }) {
+  const [name, setName] = useState(initialName || '');
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    input.focus();
+    input.select();
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event) => { if (event.key === 'Escape') onCancel(); };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [onCancel]);
+
+  const trimmed = name.trim();
+  const submit = (event) => {
+    event.preventDefault();
+    if (!trimmed) return;
+    onSave(trimmed);
+  };
+
+  return (
+    <div className="preset-modal-overlay" onMouseDown={onCancel}>
+      <form className="preset-modal" role="dialog" aria-label="Save preset" onMouseDown={(event) => event.stopPropagation()} onSubmit={submit}>
+        <div className="preset-modal-head">
+          <h2><i className="fa-regular fa-bookmark"></i> Save preset</h2>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel} aria-label="Close"><i className="fa-solid fa-xmark"></i></button>
+        </div>
+        <div className="preset-modal-body">
+          <div className="field">
+            <label htmlFor="preset-name-input">Preset name</label>
+            <input
+              id="preset-name-input"
+              ref={inputRef}
+              type="text"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="e.g. QA Preset"
+            />
+            <div className="help">Saving with an existing name overwrites that preset.</div>
+          </div>
+        </div>
+        <div className="preset-modal-foot">
+          <button type="button" className="btn btn-outline" onClick={onCancel}>Cancel</button>
+          <button type="submit" className="btn btn-primary" disabled={!trimmed}>Save preset</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 function ConfigToolbar({ presets, selectedPresetId, onSelectPreset, onSavePreset, onDeletePreset, onImportRecipe, onExportRecipe }) {
   return (
     <div className="page-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 16 }}>
@@ -312,6 +366,7 @@ function App() {
   const [cfg, set, setCfg, switchEnv, saveApiProfile, loadApiProfile, deleteApiProfile] = useConfig();
   const [savedPresets, setSavedPresets] = useState(loadPresetLibrary);
   const [selectedPresetId, setSelectedPresetId] = useState('');
+  const [presetNameDraft, setPresetNameDraft] = useState(null);
   const [runRequest, setRunRequest] = useState(null);
   const [testState, setTestState] = useState('idle');
   const [testError, setTestError] = useState('');
@@ -332,7 +387,7 @@ function App() {
   }, [showSettings]);
 
   // Lock background scroll while the settings drawer or the run modal is open.
-  const overlayOpen = showSettings || Boolean(runRequest);
+  const overlayOpen = showSettings || Boolean(runRequest) || presetNameDraft !== null;
   useEffect(() => {
     if (!overlayOpen) return undefined;
     const previousOverflow = document.body.style.overflow;
@@ -382,9 +437,12 @@ function App() {
 
   const savePreset = () => {
     const suggestedName = savedPresets.find((preset) => preset.id === selectedPresetId)?.name || cfg.basics.name || 'QA Preset';
-    const name = window.prompt('Preset name', suggestedName);
-    if (!name || !String(name).trim()) return;
-    const trimmedName = String(name).trim();
+    setPresetNameDraft(suggestedName);
+  };
+
+  const confirmSavePreset = (rawName) => {
+    if (!rawName || !String(rawName).trim()) return;
+    const trimmedName = String(rawName).trim();
     const presetData = EVENT_MODEL.exportPresetConfig(cfg, trimmedName);
     const nextId = selectedPresetId && savedPresets.some((preset) => preset.id === selectedPresetId)
       ? selectedPresetId
@@ -398,6 +456,7 @@ function App() {
       return next.sort((left, right) => left.name.localeCompare(right.name));
     });
     setSelectedPresetId(nextId);
+    setPresetNameDraft(null);
   };
 
   const loadPreset = (presetId) => {
@@ -538,6 +597,13 @@ function App() {
         onChange={importRecipe}
         style={{ display: 'none' }}
       />
+      {presetNameDraft !== null && (
+        <PresetNameModal
+          initialName={presetNameDraft}
+          onSave={confirmSavePreset}
+          onCancel={() => setPresetNameDraft(null)}
+        />
+      )}
       {runRequest && (
         <RunModal
           config={runRequest.config}
