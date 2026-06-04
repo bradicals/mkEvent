@@ -77,9 +77,20 @@ async function boot() {
   const window = createWindow();
 
   // Auto-update only in packaged builds (dev has no app-update.yml feed).
+  // Pass teardown so the updater can fully shut the proxy and any fallback
+  // child processes down BEFORE the installer runs — otherwise NSIS finds a
+  // running mkEvent.exe and reports "mkEvent cannot be closed".
   if (app.isPackaged) {
-    require('./updater.cjs').initAutoUpdater(() => window);
+    require('./updater.cjs').initAutoUpdater(() => window, teardown);
   }
+}
+
+// Run teardown (stop proxy, kill fallback children) exactly once, memoizing the
+// promise so concurrent quit paths share a single shutdown.
+let teardownPromise = null;
+function teardown() {
+  if (!teardownPromise) teardownPromise = stopProxy().catch(() => {});
+  return teardownPromise;
 }
 
 app.whenReady().then(boot);
@@ -88,15 +99,18 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
 
-app.on('window-all-closed', async () => {
-  if (process.platform !== 'darwin') {
-    await stopProxy();
-    app.quit();
-  }
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit();
 });
 
-app.on('before-quit', async () => {
-  await stopProxy();
+// Electron does NOT await async before-quit listeners, so awaiting teardown
+// inline would let the process exit (or the installer start) mid-shutdown.
+// Cancel the first quit, finish teardown, then quit for real — the second
+// before-quit sees teardown already running and lets the quit proceed.
+app.on('before-quit', (event) => {
+  if (teardownPromise) return;
+  event.preventDefault();
+  teardown().finally(() => app.quit());
 });
 
 app.on('web-contents-created', (_event, contents) => {

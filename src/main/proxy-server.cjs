@@ -237,9 +237,31 @@ function startProxyServer(options = {}) {
   });
 }
 
+// Shut the proxy server down promptly.
+//
+// The renderer (Chromium) holds HTTP keep-alive sockets to this server, and a
+// plain server.close() will NOT drop idle keep-alive connections — it waits for
+// them to close on their own (up to keepAliveTimeout). During an auto-update
+// that delay keeps the main process alive long enough for the NSIS installer to
+// report "mkEvent cannot be closed". closeAllConnections() force-drops every
+// socket so close() can complete immediately; a timeout is a final safety net so
+// shutdown can never hang.
+function closeServer(server, { timeoutMs = 2000 } = {}) {
+  return new Promise((resolve) => {
+    if (!server) { resolve(); return; }
+    let done = false;
+    const finish = () => { if (!done) { done = true; resolve(); } };
+    try { server.closeAllConnections?.(); } catch (_) { /* older runtimes */ }
+    try { server.close(() => finish()); } catch (_) { finish(); return; }
+    const timer = setTimeout(finish, timeoutMs);
+    if (typeof timer.unref === 'function') timer.unref();
+  });
+}
+
 module.exports = {
   createProxyServer,
   startProxyServer,
+  closeServer,
   forwardRequest,
   isHostAllowed,
   redactSensitive,

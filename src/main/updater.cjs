@@ -12,7 +12,13 @@ const { dialog } = require('electron');
 //
 // getWindow() lets the "restart to install" dialog attach to the main window
 // if one exists; it falls back to a standalone dialog otherwise.
-function initAutoUpdater(getWindow) {
+//
+// prepareToInstall() (optional) is awaited right before quitAndInstall so the
+// app can release resources — stop the local proxy, kill any browser-fallback
+// child processes — before the NSIS installer tries to close the app. Without
+// it the installer can find a still-running mkEvent.exe and report that the app
+// cannot be closed.
+function initAutoUpdater(getWindow, prepareToInstall) {
   autoUpdater.autoDownload = true;
   // If the user dismisses the prompt, still apply the update on next quit.
   autoUpdater.autoInstallOnAppQuit = true;
@@ -40,7 +46,14 @@ function initAutoUpdater(getWindow) {
         : await dialog.showMessageBox(options);
       if (response === 0) {
         // Defer so the dialog fully closes before the app restarts.
-        setImmediate(() => autoUpdater.quitAndInstall());
+        setImmediate(async () => {
+          try {
+            if (typeof prepareToInstall === 'function') await prepareToInstall();
+          } catch (err) {
+            console.error('[updater] prepare-to-install failed:', (err && err.message) || err);
+          }
+          autoUpdater.quitAndInstall();
+        });
       }
     } catch (err) {
       console.error('[updater] prompt failed:', (err && err.message) || err);
