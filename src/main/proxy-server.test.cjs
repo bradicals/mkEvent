@@ -8,6 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {
   startProxyServer,
+  closeServer,
   redactSensitive,
   isHostAllowed,
   tailLines,
@@ -184,6 +185,40 @@ test('POST /fallback/create-event invokes the injected runner and returns its re
     assert.strictEqual(json.eventId, '42');
     assert.strictEqual(received.action, 'create-event');
   });
+});
+
+test('closeServer resolves promptly even with an idle keep-alive connection held open', async () => {
+  // Regression for the "mkEvent cannot be closed" auto-update bug: the renderer
+  // (Chromium) keeps HTTP keep-alive sockets to the in-process proxy. A plain
+  // server.close() waits for those sockets to idle out (~keepAliveTimeout),
+  // keeping the main process alive long enough that the NSIS updater reports the
+  // app can't be closed. closeServer must force those sockets shut and resolve
+  // immediately so the process can exit.
+  const server = await startProxyServer({ port: 0, allowlist: ['127.0.0.1'] });
+  const { port } = server.address();
+
+  // Make a request over a keep-alive agent so a socket stays open afterwards.
+  const agent = new http.Agent({ keepAlive: true, maxSockets: 1 });
+  await new Promise((resolve, reject) => {
+    const req = http.request({ host: '127.0.0.1', port, path: '/health', agent }, (res) => {
+      res.resume();
+      res.on('end', resolve);
+    });
+    req.on('error', reject);
+    req.end();
+  });
+
+  const start = Date.now();
+  await closeServer(server);
+  const elapsed = Date.now() - start;
+  agent.destroy();
+
+  assert.ok(elapsed < 1500, `closeServer took ${elapsed}ms; expected a prompt shutdown`);
+});
+
+test('closeServer is a no-op on a null/undefined server', async () => {
+  await closeServer(null);
+  await closeServer(undefined);
 });
 
 test('unknown path returns 404', async () => {

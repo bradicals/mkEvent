@@ -4,10 +4,36 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { spawn } = require('node:child_process');
 const { app } = require('electron');
-const { startProxyServer } = require('./proxy-server.cjs');
+const { startProxyServer, closeServer } = require('./proxy-server.cjs');
 
 let server = null;
 let proxyState = { started: false, command: 'node-inproc', pid: null, reason: '' };
+
+// Live browser-fallback child processes. Each is a separate mkEvent.exe running
+// as Node (ELECTRON_RUN_AS_NODE) that drives Playwright Chromium. If any of
+// these are alive when an auto-update installs, the NSIS installer sees a running
+// mkEvent.exe and reports "mkEvent cannot be closed", so they must be force-killed
+// (whole tree, including the Chromium grandchildren) on shutdown.
+const childProcesses = new Set();
+
+function killProcessTree(pid) {
+  if (!pid) return;
+  try {
+    if (process.platform === 'win32') {
+      // /T kills the whole tree (Chromium children), /F forces it.
+      spawn('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore' });
+    } else {
+      process.kill(pid, 'SIGKILL');
+    }
+  } catch (_) { /* process already gone */ }
+}
+
+function killChildProcesses() {
+  for (const child of childProcesses) {
+    killProcessTree(child.pid);
+  }
+  childProcesses.clear();
+}
 
 // Mirror of proxy-server.py _browser_fallback_timeout_seconds, in milliseconds.
 function browserFallbackTimeoutMs(payload) {
@@ -71,6 +97,7 @@ function makeRunBrowserFallback(log) {
         env,
         stdio: ['pipe', 'pipe', 'pipe'],
       });
+      childProcesses.add(child);
 
       let stdout = '';
       let stderr = '';
@@ -78,7 +105,7 @@ function makeRunBrowserFallback(log) {
       const finish = (fn, arg) => { if (!settled) { settled = true; clearTimeout(timer); fn(arg); } };
 
       const timer = setTimeout(() => {
-        try { child.kill('SIGKILL'); } catch (_) {}
+        killProcessTree(child.pid);
         const err = new Error('Browser fallback timed out');
         err.code = 'timeout';
         finish(reject, err);
@@ -86,8 +113,9 @@ function makeRunBrowserFallback(log) {
 
       child.stdout.on('data', (d) => { stdout += d; });
       child.stderr.on('data', (d) => { stderr += d; });
-      child.on('error', (err) => finish(reject, err));
+      child.on('error', (err) => { childProcesses.delete(child); finish(reject, err); });
       child.on('close', (code) => {
+        childProcesses.delete(child);
         log('browser_fallback_exit', {
           action: payload.action,
           returncode: code,
@@ -143,10 +171,13 @@ async function startProxy() {
 }
 
 async function stopProxy() {
+  // Always tear down fallback children first — they can be alive even when the
+  // proxy server itself is already gone.
+  killChildProcesses();
   if (!server) return;
   const current = server;
   server = null;
-  await new Promise((resolve) => current.close(() => resolve()));
+  await closeServer(current);
   proxyState = { started: false, command: 'node-inproc', pid: null, reason: 'stopped' };
 }
 
