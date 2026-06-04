@@ -251,8 +251,12 @@ function closeServer(server, { timeoutMs = 2000 } = {}) {
     if (!server) { resolve(); return; }
     let done = false;
     const finish = () => { if (!done) { done = true; resolve(); } };
-    try { server.closeAllConnections?.(); } catch (_) { /* older runtimes */ }
+    // close() first so the server stops accepting connections, THEN drop the
+    // remaining keep-alive/idle sockets — otherwise a new connection could slip
+    // in after closeAllConnections() and before close(), and close() would wait
+    // on it.
     try { server.close(() => finish()); } catch (_) { finish(); return; }
+    try { server.closeAllConnections?.(); } catch (_) { /* older runtimes */ }
     const timer = setTimeout(finish, timeoutMs);
     if (typeof timer.unref === 'function') timer.unref();
   });
