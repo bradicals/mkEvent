@@ -7,6 +7,7 @@ const originalValidateEventSlugAvailability = model.validateEventSlugAvailabilit
 const originalBrowserFallbackCreateEvent = model.browserFallbackCreateEvent;
 const originalBrowserFallbackApplyPostItemConfig = model.browserFallbackApplyPostItemConfig;
 const originalBrowserFallbackApplyPostCreateActivity = model.browserFallbackApplyPostCreateActivity;
+const originalHttpCreateEvent = model.httpCreateEvent;
 
 // ── helpers ────────────────────────────────────────────────────────────
 
@@ -73,6 +74,7 @@ test.afterEach(() => {
   model.browserFallbackCreateEvent = originalBrowserFallbackCreateEvent;
   model.browserFallbackApplyPostItemConfig = originalBrowserFallbackApplyPostItemConfig;
   model.browserFallbackApplyPostCreateActivity = originalBrowserFallbackApplyPostCreateActivity;
+  model.httpCreateEvent = originalHttpCreateEvent;
   engine.setHostedEventRouteStatus({
     environment: {
       id: 'dev2',
@@ -811,4 +813,45 @@ test('createEvent logs verification mismatch when returned counts differ from re
   assert.match(result.verification.error, /expected 2 seeded bidders, created 1/);
   assert.match(result.verification.error, /expected 1 seeded items, created 0/);
   assert.ok(logs.some((l) => l.kind === 'error' && l.tag === 'verify' && l.msg.includes('Verification mismatch')));
+});
+
+test('createEvent uses HTTP admin create when admin creds present and no auction/ticket settings', async () => {
+  let browserFallbackCalled = false;
+  model.httpCreateEvent = async () => ({ ok: true, eventId: '4591', eventSlug: 'x', adminUrl: 'http://h/events/x' });
+  model.browserFallbackCreateEvent = async () => { browserFallbackCalled = true; return {}; };
+
+  const config = {
+    api: { env: 'dev2', organizationId: '2716', orgToken: 't', proxyUrl: 'http://localhost:9999/proxy', adminEmail: 'admin@example.test', adminPassword: 'pass' },
+    basics: { ...model.DEFAULT_CONFIG.basics, name: 'HTTP', slug: 'httpcreate', startDate: '2026-06-01', endDate: '2026-06-02', onCallDate: '2026-06-02' },
+    auctionSettings: { enabled: false },
+    bidders: { activeTab: 'bulk', bulk: { ...model.DEFAULT_CONFIG.bidders.bulk, count: 0 }, exact: { records: [] } },
+    items: { activeTab: 'bulk', bulk: { ...model.DEFAULT_CONFIG.items.bulk, silentCount: 0, liveCount: 0, donationCount: 0 }, exact: { records: [] } },
+  };
+  const recipe = model.buildRecipe(config);
+  const result = await engine.createEvent(config, recipe, noopProgress());
+
+  assert.equal(result.eventId, '4591');
+  assert.equal(browserFallbackCalled, false);
+});
+
+test('createEvent falls back to browser adapter when HTTP admin create throws', async () => {
+  let browserFallbackCalled = false;
+  model.httpCreateEvent = async () => { throw new Error('proxy offline'); };
+  model.browserFallbackCreateEvent = async (_proxyUrl, payload) => {
+    browserFallbackCalled = true;
+    return { ok: true, eventId: 'evt-http-err-fb', eventSlug: payload.event.slug, eventName: payload.event.name, adminUrl: `https://cbo.bid/events/${payload.event.slug}`, publicUrl: `https://${payload.event.slug}.cbo.bid` };
+  };
+
+  const config = {
+    api: { env: 'stage', organizationId: '2159', orgToken: 't', proxyUrl: 'http://localhost:9999/proxy', browser: 'chromium', adminEmail: 'admin@example.test', adminPassword: 'pass' },
+    auctionSettings: { enabled: false },
+    basics: { ...model.DEFAULT_CONFIG.basics, name: 'HTTP Err', slug: 'httperr', startDate: '2026-06-01', endDate: '2026-06-02', onCallDate: '2026-06-02' },
+    bidders: { activeTab: 'bulk', bulk: { ...model.DEFAULT_CONFIG.bidders.bulk, count: 0 }, exact: { records: [] } },
+    items: { activeTab: 'bulk', bulk: { ...model.DEFAULT_CONFIG.items.bulk, silentCount: 0, liveCount: 0, donationCount: 0 }, exact: { records: [] } },
+  };
+  const recipe = model.buildRecipe(config);
+  const result = await engine.createEvent(config, recipe, noopProgress());
+
+  assert.equal(result.eventId, 'evt-http-err-fb');
+  assert.equal(browserFallbackCalled, true);
 });

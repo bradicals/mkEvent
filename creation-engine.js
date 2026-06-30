@@ -327,6 +327,19 @@
     return recipe?.environment?.id === 'stage';
   }
 
+  async function tryHttpCreate(config, recipe, progress) {
+    if (recipe.auctionSettings?.enabled || recipe.ticketPages?.enabled) return null; // browser bundles those
+    if (!config.api.adminEmail || !config.api.adminPassword) return null;
+    progress.info('event', 'Trying HTTP admin create (no browser)…');
+    const r = await MODEL.httpCreateEvent(config.api.proxyUrl, {
+      baseUrl: recipe.environment.baseUrl, organizationId: recipe.environment.organizationId,
+      adminEmail: config.api.adminEmail, adminPassword: config.api.adminPassword,
+      event: { slug: recipe.event.slug, name: recipe.event.name, startDate: recipe.event.startDate, endDate: recipe.event.endDate, onCallDate: recipe.event.onCallDate || recipe.event.endDate || recipe.event.startDate, timezone: recipe.event.timezone, contactFirstName: recipe.event.contactFirstName, contactLastName: recipe.event.contactLastName, contactEmail: recipe.event.contactEmail, contactPhone: digitsOnly(recipe.event.contactPhone) },
+    });
+    progress.ok('event', `HTTP admin created event.id=${r.eventId}, keyword=${recipe.event.slug}`);
+    return { created: r, id: r.eventId, adminUrl: r.adminUrl, publicUrl: MODEL.buildPublicEventUrl(recipe.environment.baseUrl, recipe.event.slug) };
+  }
+
   function extractCreatedResourceId(response) {
     if (!response || typeof response !== 'object') return null;
     return response.id || response.data?.id || response.item?.id || response.item_id || null;
@@ -583,32 +596,36 @@
     progress.ok('event', `Keyword available: ${recipe.event.slug}`);
 
     // 1. Create event
-    let eventCreation;
-    const hostedRouteKnownUnavailable = getHostedEventRouteStatus(recipe) === 'unavailable';
-    if (shouldPreferBrowserFallback(recipe)) {
-      setHostedEventRouteStatus(recipe, 'unavailable');
-      progress.info('event', `Stage environment uses browser/admin event creation directly; skipping hosted API probe for org ${recipe.environment.organizationId}…`);
-      eventCreation = await new BrowserFallbackAdapter(client, progress).create(
-        config,
-        recipe,
-        new Error(`Unrecognized endpoint of organizations/${recipe.environment.organizationId}/events`),
-      );
-    } else if (hostedRouteKnownUnavailable) {
-      progress.info('event', `Hosted API create route previously marked unavailable for org ${recipe.environment.organizationId}; skipping probe and using browser fallback…`);
-      eventCreation = await new BrowserFallbackAdapter(client, progress).create(
-        config,
-        recipe,
-        new Error(`Unrecognized endpoint of organizations/${recipe.environment.organizationId}/events`),
-      );
-    } else {
-      try {
-        eventCreation = await new EventAdapter(client, progress).create(recipe);
-        setHostedEventRouteStatus(recipe, 'available');
-      } catch (error) {
-        if (!shouldUseBrowserFallback(error)) throw error;
+    let eventCreation = null;
+    try { eventCreation = await tryHttpCreate(config, recipe, progress); }
+    catch (httpErr) { progress.info('event', `HTTP admin create failed (${httpErr.message}); using browser/API path…`); }
+    if (!eventCreation) {
+      const hostedRouteKnownUnavailable = getHostedEventRouteStatus(recipe) === 'unavailable';
+      if (shouldPreferBrowserFallback(recipe)) {
         setHostedEventRouteStatus(recipe, 'unavailable');
-        progress.info('event', 'API-first event creation hit a known hosted-route gap; evaluating browser fallback…');
-        eventCreation = await new BrowserFallbackAdapter(client, progress).create(config, recipe, error);
+        progress.info('event', `Stage environment uses browser/admin event creation directly; skipping hosted API probe for org ${recipe.environment.organizationId}…`);
+        eventCreation = await new BrowserFallbackAdapter(client, progress).create(
+          config,
+          recipe,
+          new Error(`Unrecognized endpoint of organizations/${recipe.environment.organizationId}/events`),
+        );
+      } else if (hostedRouteKnownUnavailable) {
+        progress.info('event', `Hosted API create route previously marked unavailable for org ${recipe.environment.organizationId}; skipping probe and using browser fallback…`);
+        eventCreation = await new BrowserFallbackAdapter(client, progress).create(
+          config,
+          recipe,
+          new Error(`Unrecognized endpoint of organizations/${recipe.environment.organizationId}/events`),
+        );
+      } else {
+        try {
+          eventCreation = await new EventAdapter(client, progress).create(recipe);
+          setHostedEventRouteStatus(recipe, 'available');
+        } catch (error) {
+          if (!shouldUseBrowserFallback(error)) throw error;
+          setHostedEventRouteStatus(recipe, 'unavailable');
+          progress.info('event', 'API-first event creation hit a known hosted-route gap; evaluating browser fallback…');
+          eventCreation = await new BrowserFallbackAdapter(client, progress).create(config, recipe, error);
+        }
       }
     }
     const { created: eventResponse, id: eventId } = eventCreation;
@@ -677,7 +694,16 @@
         progress.warn('ticket-pages', 'Skipping ticket-page item config because admin credentials are missing in Settings.');
       } else {
         progress.run('ticket-pages', 'Applying ticket-page item attachments and quantity tiers…');
-        await new BrowserPostItemConfigAdapter(progress).apply(config, recipe, eventId, createdQuantityItems, createdDonationItems);
+        try {
+          await MODEL.httpApplyPostItemConfig(config.api.proxyUrl, {
+            baseUrl: recipe.environment.baseUrl, organizationId: recipe.environment.organizationId,
+            adminEmail: config.api.adminEmail, adminPassword: config.api.adminPassword,
+            eventId, quantityItems: createdQuantityItems, donationItems: createdDonationItems, ticketPages: recipe.ticketPages,
+          });
+        } catch (httpErr) {
+          progress.info('ticket-pages', `HTTP post-item config failed (${httpErr.message}); using browser fallback…`);
+          await new BrowserPostItemConfigAdapter(progress).apply(config, recipe, eventId, createdQuantityItems, createdDonationItems);
+        }
       }
     }
 
