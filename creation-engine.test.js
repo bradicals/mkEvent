@@ -8,6 +8,7 @@ const originalBrowserFallbackCreateEvent = model.browserFallbackCreateEvent;
 const originalBrowserFallbackApplyPostItemConfig = model.browserFallbackApplyPostItemConfig;
 const originalBrowserFallbackApplyPostCreateActivity = model.browserFallbackApplyPostCreateActivity;
 const originalHttpCreateEvent = model.httpCreateEvent;
+const originalHttpApplyPostItemConfig = model.httpApplyPostItemConfig;
 
 // ── helpers ────────────────────────────────────────────────────────────
 
@@ -66,6 +67,8 @@ test.beforeEach(() => {
       organizationId: '2159',
     },
   }, null);
+  // ponytail: default stub so no test hits the real proxy for post-item config
+  model.httpApplyPostItemConfig = async () => ({ ok: true, postItemConfig: { applied: [], skipped: [], warnings: [] } });
 });
 
 test.afterEach(() => {
@@ -75,6 +78,7 @@ test.afterEach(() => {
   model.browserFallbackApplyPostItemConfig = originalBrowserFallbackApplyPostItemConfig;
   model.browserFallbackApplyPostCreateActivity = originalBrowserFallbackApplyPostCreateActivity;
   model.httpCreateEvent = originalHttpCreateEvent;
+  model.httpApplyPostItemConfig = originalHttpApplyPostItemConfig;
   engine.setHostedEventRouteStatus({
     environment: {
       id: 'dev2',
@@ -632,6 +636,7 @@ test('createEvent applies quantity item tiers and ticket-page attachments after 
   mockApiProxyCall(apiStubs);
 
   let capturedFallbackPayload = null;
+  model.httpApplyPostItemConfig = async () => { throw new Error('http-stub-throw'); };
   model.browserFallbackApplyPostItemConfig = async (_proxyUrl, payload) => {
     capturedFallbackPayload = payload;
     return { ok: true, postItemConfig: { applied: [{ section: 'quantityItemTier' }], skipped: [], warnings: [] } };
@@ -854,4 +859,55 @@ test('createEvent falls back to browser adapter when HTTP admin create throws', 
 
   assert.equal(result.eventId, 'evt-http-err-fb');
   assert.equal(browserFallbackCalled, true);
+});
+
+test('createEvent uses httpApplyPostItemConfig (HTTP path) and skips browser adapter on success', async () => {
+  let httpApplyCalled = false;
+  let browserAdapterCalled = false;
+  model.httpApplyPostItemConfig = async () => {
+    httpApplyCalled = true;
+    return { ok: true, postItemConfig: { applied: [], skipped: [], warnings: [] } };
+  };
+  model.browserFallbackApplyPostItemConfig = async () => { browserAdapterCalled = true; return {}; };
+
+  const apiStubs = new Map([
+    ['POST https://cbodev2.com/api/v4/organizations/2716/events', { status: 201, body: { id: 'evt-http-pic' } }],
+    ['POST https://cbodev2.com/api/v4/events/evt-http-pic/items/bulk', { status: 201, body: { data: [{ id: 'item-http-bulk', item_number: 201, item_type_id: 40 }] } }],
+    ['POST https://cbodev2.com/api/v4/events/evt-http-pic/items', { status: 201, body: { id: 'item-http-exact', item_number: 301, item_type_id: 40 } }],
+  ]);
+  mockApiProxyCall(apiStubs);
+
+  const config = {
+    api: {
+      env: 'dev2',
+      organizationId: '2716',
+      orgToken: 't',
+      proxyUrl: 'http://localhost:9999/proxy',
+      browser: 'chromium',
+      adminEmail: 'admin@example.test',
+      adminPassword: 'password123',
+    },
+    basics: { ...model.DEFAULT_CONFIG.basics, name: 'HTTP PIC', slug: 'http-pic', startDate: '2026-06-01', endDate: '2026-06-02', onCallDate: '2026-06-02' },
+    bidders: { activeTab: 'bulk', bulk: { ...model.DEFAULT_CONFIG.bidders.bulk, count: 0 }, exact: { records: [] } },
+    items: {
+      activeTab: 'exact',
+      bulk: { ...model.DEFAULT_CONFIG.items.bulk, silentCount: 0, liveCount: 0, donationCount: 0, quantityCount: 1, startNum: 201 },
+      exact: {
+        records: [{
+          type: 'quantity',
+          item_name: 'Drink Tickets',
+          item_number: 301,
+          fair_market_value: 0,
+          qty: 100,
+          quantity_tiers: '1-25, 5-100',
+        }],
+      },
+    },
+  };
+  const recipe = model.buildRecipe(config);
+  const result = await engine.createEvent(config, recipe, noopProgress());
+
+  assert.equal(result.eventId, 'evt-http-pic');
+  assert.equal(httpApplyCalled, true, 'HTTP post-item-config should have been called');
+  assert.equal(browserAdapterCalled, false, 'browser adapter should not have been called');
 });

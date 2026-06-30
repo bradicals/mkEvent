@@ -1,7 +1,7 @@
 // src/main/admin-http.test.js
 const test = require('node:test');
 const assert = require('node:assert');
-const { createJar, scrapeLoginForm, scrapeOrgForm, adminLogin } = require('./admin-http.cjs');
+const { createJar, scrapeLoginForm, scrapeOrgForm, adminLogin, assertAllowed } = require('./admin-http.cjs');
 
 // Minimal fake Response
 function res({ status = 200, location, setCookie = [], body = '' } = {}) {
@@ -109,6 +109,12 @@ test('httpCreateEvent throws on keyword-in-use', async () => {
     httpCreateEvent({ baseUrl: 'https://cbotriage.bid', organizationId: '2518', adminEmail: 'a', adminPassword: 'p', event: { slug: 'dup' } }, { fetchImpl, allowlist: new Set(['cbotriage.bid']) }),
     /already in use/,
   );
+});
+
+test('assertAllowed blocks disallowed host and is a no-op for empty or undefined allowlist', () => {
+  assert.throws(() => assertAllowed('https://evil.example/x', new Set(['cbotriage.bid'])), /not allowed|allowed/i);
+  assert.doesNotThrow(() => assertAllowed('https://anything.example/x', new Set())); // empty set = no-op
+  assert.doesNotThrow(() => assertAllowed('https://anything.example/x', undefined));
 });
 
 const { httpApplyPostItemConfig } = require('./admin-http.cjs');
