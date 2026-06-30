@@ -71,3 +71,42 @@ test('adminLogin throws when login bounces back to login page', async () => {
     /Admin login failed/,
   );
 });
+
+const { httpCreateEvent } = require('./admin-http.cjs');
+
+function loginScript(extra) {
+  return async (url, opts = {}) => {
+    if (url.endsWith('/admin/login.php')) return res({ setCookie: ['PHPSESSID=s; Path=/'],
+      body: '<form action="index.php"><input type="hidden" name="csrf" value="T"><input name="username"><input type="password" name="password"></form>' });
+    if (url.endsWith('/admin/index.php')) return res({ status: 302, location: '/admin/welcome.php' });
+    if (url.endsWith('/admin/welcome.php')) return res({ status: 200, body: 'welcome' });
+    return extra(url, opts);
+  };
+}
+
+test('httpCreateEvent parses event id from response html data-id', async () => {
+  const fetchImpl = loginScript(async (url) => {
+    if (url.endsWith('/ajax/admin/organization/events.php')) {
+      return res({ status: 200, body: JSON.stringify({ success: true, html: '<div class="event-card" data-id="4591" data-org_id="2518">' }) });
+    }
+    return res({ status: 404 });
+  });
+  const out = await httpCreateEvent({
+    baseUrl: 'https://cbotriage.bid', organizationId: '2518', adminEmail: 'a', adminPassword: 'p',
+    event: { slug: 'qa-x', name: 'QA X', startDate: '2030-01-01', endDate: '2030-01-02', timezone: 'America/Chicago', contactEmail: 'a@b.c', contactPhone: '5551234567' },
+  }, { fetchImpl, allowlist: new Set(['cbotriage.bid']) });
+  assert.equal(out.eventId, '4591');
+  assert.equal(out.eventSlug, 'qa-x');
+  assert.equal(out.adminUrl, 'https://cbotriage.bid/events/qa-x');
+});
+
+test('httpCreateEvent throws on keyword-in-use', async () => {
+  const fetchImpl = loginScript(async (url) => {
+    if (url.endsWith('/ajax/admin/organization/events.php')) return res({ status: 200, body: JSON.stringify({ success: false, message: 'keyword already in use' }) });
+    return res({ status: 404 });
+  });
+  await assert.rejects(
+    httpCreateEvent({ baseUrl: 'https://cbotriage.bid', organizationId: '2518', adminEmail: 'a', adminPassword: 'p', event: { slug: 'dup' } }, { fetchImpl, allowlist: new Set(['cbotriage.bid']) }),
+    /already in use/,
+  );
+});

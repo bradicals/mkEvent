@@ -123,4 +123,47 @@ async function adminLogin({ fetchImpl = fetch, baseUrl, adminEmail, adminPasswor
   return { jar, request, base };
 }
 
-module.exports = { createJar, assertAllowed, scrapeLoginForm, scrapeOrgForm, adminLogin };
+function toDateOnly(value) {
+  if (!value) return '';
+  const s = String(value);
+  return s.length >= 10 ? s.slice(0, 10) : s;
+}
+function digitsOnly(value) { return String(value || '').replace(/\D/g, ''); }
+
+function parseEventResult(body) {
+  let json = body;
+  if (typeof body === 'string') { try { json = JSON.parse(body); } catch (_) { json = { success: false, message: body }; } }
+  const id = json.id ?? json.data?.id ?? (typeof json.html === 'string' ? (json.html.match(/data-id=["'](\d+)["']/) || [])[1] : null);
+  return { json, id: id ? String(id) : null };
+}
+
+async function httpCreateEvent(payload, { fetchImpl = fetch, allowlist } = {}) {
+  const base = String(payload.baseUrl).replace(/\/$/, '');
+  const session = await adminLogin({
+    fetchImpl, baseUrl: base, adminEmail: payload.adminEmail, adminPassword: payload.adminPassword,
+    organizationId: payload.organizationId, allowlist,
+  });
+  const e = payload.event;
+  const form = {
+    action: 'create-event', reuseKeyword: '', keyword: e.slug, eventName: e.name,
+    eventStartDate: toDateOnly(e.startDate), eventClosingDate: toDateOnly(e.endDate),
+    eventOnCallDate: toDateOnly(e.onCallDate || e.endDate || e.startDate),
+    timeZone: e.timezone || 'America/Chicago', openAuctionEarly: 'true',
+    firstName: e.contactFirstName, lastName: e.contactLastName, email: e.contactEmail, phone: digitsOnly(e.contactPhone),
+    copyFromEvent: '0',
+  };
+  const resp = await session.request('POST', `${base}/ajax/admin/organization/events.php`, {
+    form, headers: { 'X-Requested-With': 'XMLHttpRequest' },
+  });
+  const { json, id } = parseEventResult(resp.body);
+  if (resp.status >= 400 || json.success === false) {
+    const msg = json.message || `HTTP ${resp.status}`;
+    if (/keyword/i.test(msg) && /already/i.test(msg)) throw new Error(`Event keyword "${e.slug}" is already in use on ClickBid. ${msg}`);
+    throw new Error(`HTTP event creation failed: ${msg}`);
+  }
+  if (!id) throw new Error(`HTTP event creation succeeded but no event ID found. Body: ${String(resp.body).slice(0, 300)}`);
+  const eventSlug = json.slug ?? json.data?.slug ?? e.slug;
+  return { ok: true, eventId: id, eventSlug, eventName: e.name, adminUrl: `${base}/events/${eventSlug}` };
+}
+
+module.exports = { createJar, assertAllowed, scrapeLoginForm, scrapeOrgForm, adminLogin, httpCreateEvent, toDateOnly, digitsOnly, parseEventResult };
