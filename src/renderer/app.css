@@ -104,7 +104,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-brand-prim
   transition: border-color 0.2s ease;
 }
 .section.is-open { border-color: #e0eaf3; }
-.section.has-error { border-color: #fecaca; box-shadow: 0 18px 38px -28px rgba(220,38,38,0.25); }
 
 .section-head {
   display: flex; align-items: center; gap: 16px;
