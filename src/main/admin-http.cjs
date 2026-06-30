@@ -3,6 +3,10 @@
 
 const { buildTicketPageItemAttachmentPlans } = require('../../browser-fallback.cjs');
 
+// ponytail: per-request ceiling so a stalled admin fetch can't hang event creation
+// indefinitely; raise if a real admin call legitimately runs longer.
+const ADMIN_REQUEST_TIMEOUT_MS = 30000;
+
 function createJar() {
   const jar = new Map();
   return {
@@ -21,9 +25,14 @@ function createJar() {
 }
 
 function assertAllowed(urlStr, allowlist) {
-  if (!allowlist || typeof allowlist.has !== 'function' || allowlist.size === 0) return;
-  let host = '';
-  try { host = new URL(urlStr).hostname || ''; } catch (_) { host = ''; }
+  // Fail closed: admin requests carry credentials, so refuse unless a real allowlist is present.
+  if (!allowlist || typeof allowlist.has !== 'function' || allowlist.size === 0) {
+    throw new Error('Refusing admin HTTP request: no ClickBid host allowlist configured.');
+  }
+  let url = null;
+  try { url = new URL(urlStr); } catch (_) { url = null; }
+  if (!url || url.protocol !== 'https:') throw new Error(`Refusing non-HTTPS admin target '${urlStr}'.`);
+  const host = url.hostname || '';
   if (!host || !allowlist.has(host)) throw new Error(`Host '${host || '(unknown)'}' is not an allowed ClickBid target.`);
 }
 
@@ -78,6 +87,7 @@ async function adminLogin({ fetchImpl = fetch, baseUrl, adminEmail, adminPasswor
       },
       body: form ? (form instanceof URLSearchParams ? form.toString() : new URLSearchParams(form).toString()) : undefined,
       redirect: 'manual',
+      signal: AbortSignal.timeout(ADMIN_REQUEST_TIMEOUT_MS),
     });
     jar.absorb(resp);
     return resp;
@@ -151,7 +161,7 @@ async function httpCreateEvent(payload, { fetchImpl = fetch, allowlist } = {}) {
     eventStartDate: toDateOnly(e.startDate), eventClosingDate: toDateOnly(e.endDate),
     eventOnCallDate: toDateOnly(e.onCallDate || e.endDate || e.startDate),
     timeZone: e.timezone || 'America/Chicago', openAuctionEarly: 'true',
-    firstName: e.contactFirstName, lastName: e.contactLastName, email: e.contactEmail, phone: digitsOnly(e.contactPhone),
+    firstName: e.contactFirstName || '', lastName: e.contactLastName || '', email: e.contactEmail || '', phone: digitsOnly(e.contactPhone),
     copyFromEvent: '0',
   };
   const resp = await session.request('POST', `${base}/ajax/admin/organization/events.php`, {
@@ -163,7 +173,13 @@ async function httpCreateEvent(payload, { fetchImpl = fetch, allowlist } = {}) {
     if (/keyword/i.test(msg) && /already/i.test(msg)) throw new Error(`Event keyword "${e.slug}" is already in use on ClickBid. ${msg}`);
     throw new Error(`HTTP event creation failed: ${msg}`);
   }
-  if (!id) throw new Error(`HTTP event creation succeeded but no event ID found. Body: ${String(resp.body).slice(0, 300)}`);
+  if (!id) {
+    // The POST was accepted but we couldn't read the new id — the event may exist.
+    // Mark it so the caller surfaces the error instead of blindly creating a duplicate.
+    const err = new Error(`HTTP event creation reported success but no event ID was found — the event may have been created. Check organization ${payload.organizationId} before retrying. Body: ${String(resp.body).slice(0, 300)}`);
+    err.eventLikelyCreated = true;
+    throw err;
+  }
   const eventSlug = json.slug ?? json.data?.slug ?? e.slug;
   return { ok: true, eventId: id, eventSlug, eventName: e.name, adminUrl: `${base}/events/${eventSlug}` };
 }
@@ -185,25 +201,30 @@ async function httpApplyPostItemConfig(payload, { fetchImpl = fetch, allowlist }
     organizationId: payload.organizationId, allowlist,
   });
 
-  await session.request('POST', `${base}/admin/event.php`, { form: { 'event-id': String(payload.eventId) } });
+  const switched = await session.request('POST', `${base}/admin/event.php`, { form: { 'event-id': String(payload.eventId) } });
+  if (/\/admin\/login\.php/i.test(switched.url) || /select-organization/i.test(switched.url)) {
+    throw new Error(`Failed to switch to event ${payload.eventId} (landed on ${switched.url}); aborting HTTP post-item config.`);
+  }
 
   const butler = await session.request('GET', `${base}/butler/event-utilities.php`);
   const csrf = scrapeCsrfMeta(butler.body);
+  if (!csrf) throw new Error('Could not read CSRF token for HTTP post-item config; aborting so browser fallback can handle it.');
 
   const applied = [], skipped = [], warnings = [];
   const postForm = (url, form) => session.request('POST', url, {
-    form, headers: { 'X-Requested-With': 'XMLHttpRequest', ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {}) },
+    form, headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': csrf },
   });
 
   const quantityItems = Array.isArray(payload.quantityItems) ? payload.quantityItems : [];
   for (const item of quantityItems) {
     for (const tier of (Array.isArray(item.quantity_tiers) ? item.quantity_tiers : [])) {
-      const quantity = Number(tier?.quantity) || 0;
-      const price = Math.max(0, Number(tier?.price) || 0);
-      if (!quantity) { skipped.push({ section: 'quantityItemTier', itemId: String(item.id), reason: 'missing quantity' }); continue; }
+      const quantity = Number(tier?.quantity);
+      const price = Number(tier?.price);
+      if (!Number.isFinite(quantity) || quantity <= 0) { skipped.push({ section: 'quantityItemTier', itemId: String(item.id), reason: 'invalid or missing quantity' }); continue; }
+      if (!Number.isFinite(price) || price < 0) { skipped.push({ section: 'quantityItemTier', itemId: String(item.id), reason: 'invalid price' }); continue; }
       const r = await postForm(`${base}/ajax/admin/manage-items.php`, { action: 'set_item_quantity', id: 'new', quantity: String(quantity), price: String(price), item_id: String(item.id) });
-      let ok = r.status < 400;
-      try { ok = ok && JSON.parse(r.body)?.success !== false; } catch (_) {}
+      let ok = false;
+      if (r.status < 400) { try { ok = JSON.parse(r.body)?.success !== false; } catch (_) { ok = false; } }
       if (!ok) { warnings.push({ section: 'quantityItemTier', itemId: String(item.id), message: `tier save failed (HTTP ${r.status})` }); continue; }
       applied.push({ section: 'quantityItemTier', itemId: String(item.id), itemName: item.item_name || 'Quantity item', quantity, price });
     }
@@ -220,8 +241,8 @@ async function httpApplyPostItemConfig(payload, { fetchImpl = fetch, allowlist }
     body.append('formId', String(formId));
     for (const it of plan.resolvedItems) body.append('itemIds[]', String(it.id));
     const r = await postForm(`${base}/ajax/admin/ticket-form.php`, body);
-    let ok = r.status < 400;
-    try { ok = ok && JSON.parse(r.body)?.success !== false; } catch (_) {}
+    let ok = false;
+    if (r.status < 400) { try { ok = JSON.parse(r.body)?.success !== false; } catch (_) { ok = false; } }
     if (!ok) warnings.push({ section: 'ticketPageItems', formName: plan.formName, message: `sync-items failed (HTTP ${r.status})` });
     else applied.push({ section: 'ticketPageItems', formName: plan.formName, itemCount: plan.resolvedItems.length });
   }

@@ -598,7 +598,12 @@
     // 1. Create event
     let eventCreation = null;
     try { eventCreation = await tryHttpCreate(config, recipe, progress); }
-    catch (httpErr) { progress.info('event', `HTTP admin create failed (${httpErr.message}); using browser/API path…`); }
+    catch (httpErr) {
+      // Don't fall back (and risk a duplicate event) when the create POST may have
+      // succeeded server-side but we couldn't read the new id back.
+      if (httpErr.eventLikelyCreated) throw httpErr;
+      progress.info('event', `HTTP admin create failed (${httpErr.message}); using browser/API path…`);
+    }
     if (!eventCreation) {
       const hostedRouteKnownUnavailable = getHostedEventRouteStatus(recipe) === 'unavailable';
       if (shouldPreferBrowserFallback(recipe)) {
@@ -695,11 +700,16 @@
       } else {
         progress.run('ticket-pages', 'Applying ticket-page item attachments and quantity tiers…');
         try {
-          await MODEL.httpApplyPostItemConfig(config.api.proxyUrl, {
+          const httpResult = await MODEL.httpApplyPostItemConfig(config.api.proxyUrl, {
             baseUrl: recipe.environment.baseUrl, organizationId: recipe.environment.organizationId,
             adminEmail: config.api.adminEmail, adminPassword: config.api.adminPassword,
             eventId, quantityItems: createdQuantityItems, donationItems: createdDonationItems, ticketPages: recipe.ticketPages,
           });
+          // Surface the same applied/skipped/warnings summary the browser adapter logs.
+          const pci = httpResult?.postItemConfig || {};
+          progress.info('ticket-pages', `HTTP post-item ticket-page item config: ${pci.applied?.length || 0} applied, ${pci.skipped?.length || 0} skipped, ${pci.warnings?.length || 0} warnings.`);
+          const pciLabel = (e) => [e.section, e.formName, e.target, e.feature, e.name].filter(Boolean).join(' · ');
+          (pci.warnings || []).forEach((w) => progress.warn('ticket-pages', `⚠ ${pciLabel(w)}${pciLabel(w) ? ': ' : ''}${w.message || 'unspecified warning'}`));
         } catch (httpErr) {
           progress.info('ticket-pages', `HTTP post-item config failed (${httpErr.message}); using browser fallback…`);
           await new BrowserPostItemConfigAdapter(progress).apply(config, recipe, eventId, createdQuantityItems, createdDonationItems);

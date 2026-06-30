@@ -283,3 +283,39 @@ test('POST /fallback/create-event-http returns 400 when required field is missin
     assert.ok(json.message.includes('Missing'));
   });
 });
+
+test('POST /fallback/post-item-config-http dispatches to runHttpAdmin and returns result', async () => {
+  const stub = async (action, payload) => ({ ok: true, action, eventId: payload.eventId, postItemConfig: { applied: [], skipped: [], warnings: [] } });
+  await withProxy({ runHttpAdmin: stub }, async (proxyBase) => {
+    const res = await fetch(`${proxyBase}/fallback/post-item-config-http`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        baseUrl: 'http://127.0.0.1', organizationId: '2518',
+        adminEmail: 'a', adminPassword: 'p', eventId: '4591',
+      }),
+    });
+    const json = await res.json();
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(json.action, 'post-item-config-http');
+    assert.strictEqual(json.eventId, '4591');
+  });
+});
+
+test('POST /fallback/post-item-config-http returns 400 when required field is missing', async () => {
+  const stub = async () => ({ ok: true });
+  await withProxy({ runHttpAdmin: stub }, async (proxyBase) => {
+    const res = await fetch(`${proxyBase}/fallback/post-item-config-http`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        baseUrl: 'http://127.0.0.1', organizationId: '2518',
+        adminEmail: 'a', adminPassword: 'p',
+        // eventId field omitted
+      }),
+    });
+    const json = await res.json();
+    assert.strictEqual(res.status, 400);
+    assert.ok(json.message.includes('Missing'));
+  });
+});

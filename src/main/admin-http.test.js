@@ -111,10 +111,11 @@ test('httpCreateEvent throws on keyword-in-use', async () => {
   );
 });
 
-test('assertAllowed blocks disallowed host and is a no-op for empty or undefined allowlist', () => {
+test('assertAllowed blocks disallowed host and fails closed on empty/missing allowlist or non-HTTPS', () => {
   assert.throws(() => assertAllowed('https://evil.example/x', new Set(['cbotriage.bid'])), /not allowed|allowed/i);
-  assert.doesNotThrow(() => assertAllowed('https://anything.example/x', new Set())); // empty set = no-op
-  assert.doesNotThrow(() => assertAllowed('https://anything.example/x', undefined));
+  assert.throws(() => assertAllowed('https://anything.example/x', new Set()), /allowlist/i);
+  assert.throws(() => assertAllowed('https://anything.example/x', undefined), /allowlist/i);
+  assert.throws(() => assertAllowed('http://cbotriage.bid/x', new Set(['cbotriage.bid'])), /HTTPS/i);
 });
 
 const { httpApplyPostItemConfig } = require('./admin-http.cjs');
@@ -137,4 +138,35 @@ test('httpApplyPostItemConfig sets event, reads csrf, posts a quantity tier', as
   assert.match(posted[0].body, /item_id=12/);
   assert.match(posted[0].body, /quantity=2/);
   assert.equal(posted[0].headers['X-CSRF-TOKEN'], 'CT');
+});
+
+test('httpApplyPostItemConfig records a failed tier write as a warning, not applied', async () => {
+  const fetchImpl = loginScript(async (url) => {
+    if (url.endsWith('/admin/event.php')) return res({ status: 302, location: '/admin/welcome.php' });
+    if (url.endsWith('/butler/event-utilities.php')) return res({ status: 200, body: '<meta name="csrf-token" content="CT">' });
+    if (url.endsWith('/ajax/admin/manage-items.php')) return res({ status: 200, body: JSON.stringify({ success: false, message: 'nope' }) });
+    return res({ status: 404 });
+  });
+  const out = await httpApplyPostItemConfig({
+    baseUrl: 'https://cbotriage.bid', organizationId: '2518', adminEmail: 'a', adminPassword: 'p',
+    eventId: '4591', quantityItems: [{ id: '12', item_name: 'Q', quantity_tiers: [{ quantity: 2, price: 50 }] }],
+    donationItems: [], ticketPages: { pages: [] },
+  }, { fetchImpl, allowlist: new Set(['cbotriage.bid']) });
+  assert.equal(out.postItemConfig.applied.length, 0);
+  assert.equal(out.postItemConfig.warnings.length, 1);
+});
+
+test('httpApplyPostItemConfig aborts when no CSRF token is found (so browser fallback can run)', async () => {
+  const fetchImpl = loginScript(async (url) => {
+    if (url.endsWith('/admin/event.php')) return res({ status: 302, location: '/admin/welcome.php' });
+    if (url.endsWith('/butler/event-utilities.php')) return res({ status: 200, body: '<html>no meta here</html>' });
+    return res({ status: 404 });
+  });
+  await assert.rejects(
+    httpApplyPostItemConfig({
+      baseUrl: 'https://cbotriage.bid', organizationId: '2518', adminEmail: 'a', adminPassword: 'p',
+      eventId: '4591', quantityItems: [], donationItems: [], ticketPages: { pages: [] },
+    }, { fetchImpl, allowlist: new Set(['cbotriage.bid']) }),
+    /CSRF token/i,
+  );
 });
