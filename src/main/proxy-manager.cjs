@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const { spawn } = require('node:child_process');
 const { app } = require('electron');
 const { startProxyServer, closeServer } = require('./proxy-server.cjs');
+const adminHttp = require('./admin-http.cjs');
 
 let server = null;
 let proxyState = { started: false, command: 'node-inproc', pid: null, reason: '' };
@@ -133,6 +134,14 @@ function makeRunBrowserFallback(log) {
   };
 }
 
+function makeRunHttpAdmin() {
+  return async function runHttpAdmin(action, payload, allowlist) {
+    if (action === 'create-event-http') return adminHttp.httpCreateEvent(payload, { allowlist });
+    if (action === 'post-item-config-http') return adminHttp.httpApplyPostItemConfig(payload, { allowlist });
+    throw new Error(`Unknown HTTP admin action: ${action}`);
+  };
+}
+
 // Returns { logger, logPath } so /debug/logs can tail the same file the logger writes.
 function makeFileLogger() {
   let logPath;
@@ -159,6 +168,7 @@ async function startProxy() {
       host: '127.0.0.1',
       port: 9999,
       runBrowserFallback: makeRunBrowserFallback(logger),
+      runHttpAdmin: makeRunHttpAdmin(),
       logger,
       logPath,
     });
