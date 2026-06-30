@@ -7,7 +7,19 @@ export function Section({ icon, title, sub, summary, defaultOpen = false, childr
   const [open, setOpen] = useState(defaultOpen);
   return (
     <section className={`section ${open ? 'is-open' : ''}`}>
-      <header className="section-head" onClick={() => setOpen(o => !o)}>
+      <header
+        className="section-head"
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+        onClick={() => setOpen(o => !o)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setOpen(o => !o);
+          }
+        }}
+      >
         <div className="section-icon"><i className={`fa-solid ${icon}`}></i></div>
         <div className="section-titles">
           <h3 className="section-title">{title}</h3>
