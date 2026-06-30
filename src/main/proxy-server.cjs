@@ -24,6 +24,8 @@ const FALLBACK_REQUIRED = {
   'create-event': ['baseUrl', 'organizationId', 'browser', 'adminEmail', 'adminPassword', 'event'],
   'post-item-config': ['baseUrl', 'organizationId', 'browser', 'adminEmail', 'adminPassword', 'eventId'],
   'post-create-activity': ['baseUrl', 'organizationId', 'browser', 'adminEmail', 'adminPassword', 'eventId', 'eventSlug'],
+  'create-event-http': ['baseUrl', 'organizationId', 'adminEmail', 'adminPassword', 'event'],
+  'post-item-config-http': ['baseUrl', 'organizationId', 'adminEmail', 'adminPassword', 'eventId'],
 };
 
 function redactSensitive(value) {
@@ -140,6 +142,7 @@ function sendFallbackError(res, status, message, errorCode) {
 function createProxyServer(options = {}) {
   const allowlist = new Set([...TRUSTED_CLICKBID_HOSTS, ...(options.allowlist || [])]);
   const runBrowserFallback = options.runBrowserFallback;
+  const runHttpAdmin = options.runHttpAdmin;
   const logPath = options.logPath || null;
   const log = options.logger || (() => {});
 
@@ -190,6 +193,16 @@ function createProxyServer(options = {}) {
         if (missing.length) { sendFallbackError(res, 400, `Missing browser fallback fields: ${missing.join(', ')}`); return; }
         const host = isHostAllowed(body.baseUrl || '', allowlist);
         if (!host.allowed) { sendFallbackError(res, 403, `Host '${host.host || '(unknown)'}' is not an allowed ClickBid target. Allowed hosts: ${allowlistText(allowlist)}`); return; }
+        if (action.endsWith('-http')) {
+          if (typeof runHttpAdmin !== 'function') { sendFallbackError(res, 501, 'HTTP admin runner is not configured', 'http_admin_unavailable'); return; }
+          try {
+            const result = await runHttpAdmin(action, body, allowlist);
+            sendJson(res, 200, result);
+          } catch (err) {
+            sendFallbackError(res, 502, (err && err.message) || 'http admin failed', 'http_admin_error');
+          }
+          return;
+        }
         if (typeof runBrowserFallback !== 'function') { sendFallbackError(res, 501, 'Browser fallback runner is not configured', 'browser_fallback_unavailable'); return; }
         try {
           const result = await runBrowserFallback({ ...body, action });

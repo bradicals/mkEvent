@@ -25,6 +25,12 @@ const CREDIT_CARD_TICKET_PURCHASE_CONCURRENCY = Math.max(
   1,
   Number(process.env.MKEVENT_CC_PURCHASE_CONCURRENCY) || 4,
 );
+// How long to wait for the public checkout's "Add" control to render before
+// giving up on a browser ticket purchase. ponytail: short, non-retryable — when
+// the ticket-page JS doesn't render (e.g. the bidapp asset bundles 403 from the
+// CDN, or markup shifts), the button never appears, so a long actionability wait
+// would just hang ~30s per attempt. Fail fast with a clear cause instead.
+const TICKET_ADD_BUTTON_TIMEOUT_MS = 12000;
 
 function readStdin() {
   return new Promise((resolve, reject) => {
@@ -1103,6 +1109,22 @@ async function navigateTicketPurchaseSection(page, label) {
 
 async function setTicketQuantityByIndex(page, index, quantity) {
   const addButton = page.getByRole('button', { name: /^Add 1 / }).nth(index);
+  // Confirm the ticket UI actually rendered the "Add" control before clicking it.
+  // If it never appears, the public checkout's front-end assets likely failed to
+  // load (e.g. CDN 403 on the bidapp JS bundles), so the wizard never initialized
+  // and no click sequence can recover it — fail fast and non-retryably with a
+  // clear cause instead of hanging ~30s on actionability per attempt.
+  try {
+    await addButton.waitFor({ state: 'visible', timeout: TICKET_ADD_BUTTON_TIMEOUT_MS });
+  } catch (_) {
+    const err = new Error(
+      'Public ticket checkout did not render an "Add" control — the page\'s front-end '
+      + 'assets may be failing to load (e.g. CDN 403 on the bidapp JS bundles). '
+      + 'Skipping browser ticket purchase.',
+    );
+    err.ticketPageUnavailable = true;
+    throw err;
+  }
   for (let i = 0; i < quantity; i += 1) {
     await addButton.click();
   }
@@ -2212,6 +2234,10 @@ async function applyPostCreateActivity(page, baseUrl, eventSlug, postCreateActiv
               : performSeededTicketPurchase(page, baseUrl, eventSlug, normalized, purchaseTarget, purchaseIndex, addDonation)),
             {
               attempts: 3,
+              // A ticket page that never rendered its "Add" control is a deterministic
+              // page-state failure (broken/blocked assets), not a flaky checkout —
+              // retrying just burns ~30s more per attempt, so veto it.
+              shouldRetry: (err) => !err?.ticketPageUnavailable,
               onRetry: (err, attempt) => process.stderr.write(
                 `[fallback] Purchase ${purchaseIndex + 1} attempt ${attempt} failed (${err.message}); retrying…\n`,
               ),

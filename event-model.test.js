@@ -1207,6 +1207,54 @@ test('browserFallbackApplyPostItemConfig posts to the proxy post-item endpoint',
   }
 });
 
+test('httpCreateEvent posts to the http create endpoint', async () => {
+  const originalFetch = global.fetch;
+  let capturedUrl;
+  let capturedBody;
+  global.fetch = async (url, options) => {
+    capturedUrl = url;
+    capturedBody = JSON.parse(options.body);
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true, eventId: '4591' }),
+    };
+  };
+
+  try {
+    const result = await model.httpCreateEvent('http://localhost:9999/proxy', { browser: 'chromium', event: { slug: 'qa-http' } });
+    assert.equal(capturedUrl, 'http://localhost:9999/fallback/create-event-http');
+    assert.equal(capturedBody.browser, 'chromium');
+    assert.equal(result.eventId, '4591');
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('httpApplyPostItemConfig posts to the http post-item-config endpoint', async () => {
+  const originalFetch = global.fetch;
+  let capturedUrl;
+  let capturedBody;
+  global.fetch = async (url, options) => {
+    capturedUrl = url;
+    capturedBody = JSON.parse(options.body);
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true, eventId: 'evt-http' }),
+    };
+  };
+
+  try {
+    const result = await model.httpApplyPostItemConfig('http://localhost:9999/proxy', { eventId: 'evt-http', quantityItems: [{ id: '99' }] });
+    assert.equal(capturedUrl, 'http://localhost:9999/fallback/post-item-config-http');
+    assert.equal(capturedBody.eventId, 'evt-http');
+    assert.equal(result.eventId, 'evt-http');
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test('summarizeRecipe publicUrl reflects the primary ticket-page form name', () => {
   const baseConfig = model.buildRecipe(model.DEFAULT_CONFIG);
   // Ticket pages OFF -> URL is the event root (no path).
