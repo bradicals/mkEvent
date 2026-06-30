@@ -1745,6 +1745,26 @@
     throw new Error(data?.message || data?.error || `Browser fallback post-item config failed with HTTP ${response.status}`);
   }
 
+  async function httpCreateEvent(proxyUrl, payload) {
+    const response = await fetch(proxyToolUrl(proxyUrl, '/fallback/create-event-http'), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload || {}),
+    });
+    let data;
+    try { data = await response.json(); } catch (_) { const t = await response.text().catch(() => ''); throw new Error(t || `HTTP create failed with HTTP ${response.status}`); }
+    if (response.ok && data?.ok) return data;
+    throw new Error(data?.message || data?.error || `HTTP create failed with HTTP ${response.status}`);
+  }
+
+  async function httpApplyPostItemConfig(proxyUrl, payload) {
+    const response = await fetch(proxyToolUrl(proxyUrl, '/fallback/post-item-config-http'), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload || {}),
+    });
+    let data;
+    try { data = await response.json(); } catch (_) { const t = await response.text().catch(() => ''); throw new Error(t || `HTTP post-item config failed with HTTP ${response.status}`); }
+    if (response.ok && data?.ok) return data;
+    throw new Error(data?.message || data?.error || `HTTP post-item config failed with HTTP ${response.status}`);
+  }
+
   async function browserFallbackApplyPostCreateActivity(proxyUrl, payload) {
     const response = await fetch(proxyToolUrl(proxyUrl, '/fallback/post-create-activity'), {
       method: 'POST',
@@ -1782,6 +1802,8 @@
     browserFallbackApplyPostItemConfig,
     browserFallbackApplyPostCreateActivity,
     browserFallbackCreateEvent,
+    httpCreateEvent,
+    httpApplyPostItemConfig,
     buildPublicEventUrl,
     buildRecipe,
     environmentPatch,
