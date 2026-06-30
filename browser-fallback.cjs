@@ -68,16 +68,6 @@ function requirePlaywright() {
   );
 }
 
-/**
- * Convert "YYYY-MM-DD" to "YYYY-MM-DD HH:MM:SS" for the AJAX endpoint.
- * Appends 00:00:00 if no time component is present.
- */
-function toDateTime(dateStr) {
-  if (!dateStr) return '';
-  if (dateStr.includes(' ')) return dateStr; // already has time
-  return `${dateStr} 00:00:00`;
-}
-
 function toDateOnly(dateStr) {
   return String(dateStr || '').trim().split(/[ T]/)[0] || '';
 }
@@ -459,7 +449,6 @@ function buildTicketPagePlans(ticketPages) {
       page,
       initialFormName: null,
       targetFormName,
-      usesExistingDefault: false,
     };
   });
 }
@@ -2609,10 +2598,6 @@ function buildTicketPageItemAttachmentPlans(ticketPages, quantityItems, donation
   });
 }
 
-function buildTicketPageQuantityAttachmentPlans(ticketPages, quantityItems) {
-  return buildTicketPageItemAttachmentPlans(ticketPages, quantityItems, []);
-}
-
 async function applyQuantityItemTier(page, item, csrfToken) {
   const tiers = Array.isArray(item?.quantity_tiers) ? item.quantity_tiers : [];
   const applied = [];
@@ -2690,10 +2675,6 @@ async function syncTicketPageItems(page, baseUrl, formName, resolvedItems) {
     ticketFormId: String(ticketFormId),
     itemIds,
   };
-}
-
-async function syncTicketPageQuantityItems(page, baseUrl, formName, resolvedItems) {
-  return syncTicketPageItems(page, baseUrl, formName, resolvedItems);
 }
 
 async function applyPostItemConfig(payload) {
@@ -3002,7 +2983,6 @@ module.exports = {
   createBidderSessionCache,
   createTemporaryCheckoutPage,
   gotoResolvedPublicTicketPage,
-  buildTicketPageQuantityAttachmentPlans,
   chooseBidderForAuctionItem,
   filterPostCreateAuctionItems,
   filterPostCreateDonationItems,
@@ -3025,7 +3005,6 @@ module.exports = {
   setInputValue,
   setSelectValue,
   syncTicketPageItems,
-  syncTicketPageQuantityItems,
   switchToEvent,
   waitForLoginOutcome,
   requirePlaywright,
@@ -3034,5 +3013,4 @@ module.exports = {
   resolvePostCreatePurchaseTarget,
   resolvePostCreatePurchaseTargetForOrdinal,
   resolveSelectionSelectable,
-  toDateTime,
 };

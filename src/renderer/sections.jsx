@@ -3,21 +3,20 @@
 import React, { useRef, useState } from 'react';
 import MODEL from '../shared/event-model.js';
 
-export function Section({ id, icon, title, sub, summary, defaultOpen = false, forceOpen = false, error = false, children }) {
+export function Section({ icon, title, sub, summary, defaultOpen = false, children }) {
   const [open, setOpen] = useState(defaultOpen);
-  const isOpen = forceOpen || open;
   return (
-    <section className={`section ${isOpen ? 'is-open' : ''} ${error ? 'has-error' : ''}`} id={id}>
-      <header className="section-head" onClick={() => !forceOpen && setOpen(o => !o)}>
+    <section className={`section ${open ? 'is-open' : ''}`}>
+      <header className="section-head" onClick={() => setOpen(o => !o)}>
         <div className="section-icon"><i className={`fa-solid ${icon}`}></i></div>
         <div className="section-titles">
           <h3 className="section-title">{title}</h3>
           {sub && <p className="section-sub">{sub}</p>}
         </div>
         <div className="section-meta">{summary}</div>
-        {!forceOpen && <i className="fa-solid fa-chevron-down section-chev"></i>}
+        <i className="fa-solid fa-chevron-down section-chev"></i>
       </header>
-      {isOpen && (
+      {open && (
         <div className="section-body">
           <div className="section-body-inner">{children}</div>
         </div>

@@ -255,7 +255,7 @@ function ConfigToolbar({ presets, selectedPresetId, onSelectPreset, onSavePreset
   );
 }
 
-function AppFoot({ cfg, recipe, summary, slugCheck, onCreate }) {
+function AppFoot({ cfg, summary, slugCheck, onCreate }) {
   const basicsReady = Boolean(
     cfg.basics.name &&
     cfg.basics.slug &&
@@ -585,7 +585,6 @@ function App() {
       </div>
       <AppFoot
         cfg={cfg}
-        recipe={recipe}
         summary={summary}
         slugCheck={slugCheck}
         onCreate={openRunModal}
