@@ -198,7 +198,7 @@ async function httpApplyPostItemConfig(payload, { fetchImpl = fetch, allowlist }
   const quantityItems = Array.isArray(payload.quantityItems) ? payload.quantityItems : [];
   for (const item of quantityItems) {
     for (const tier of (Array.isArray(item.quantity_tiers) ? item.quantity_tiers : [])) {
-      const quantity = Math.max(1, Number(tier?.quantity) || 0);
+      const quantity = Number(tier?.quantity) || 0;
       const price = Math.max(0, Number(tier?.price) || 0);
       if (!quantity) { skipped.push({ section: 'quantityItemTier', itemId: String(item.id), reason: 'missing quantity' }); continue; }
       const r = await postForm(`${base}/ajax/admin/manage-items.php`, { action: 'set_item_quantity', id: 'new', quantity: String(quantity), price: String(price), item_id: String(item.id) });

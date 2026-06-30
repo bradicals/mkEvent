@@ -118,7 +118,7 @@ test('httpApplyPostItemConfig sets event, reads csrf, posts a quantity tier', as
   const fetchImpl = loginScript(async (url, opts = {}) => {
     if (url.endsWith('/admin/event.php')) return res({ status: 302, location: '/admin/welcome.php' });
     if (url.endsWith('/butler/event-utilities.php')) return res({ status: 200, body: '<meta name="csrf-token" content="CT">' });
-    if (url.endsWith('/ajax/admin/manage-items.php')) { posted.push(opts.body); return res({ status: 200, body: JSON.stringify({ success: true }) }); }
+    if (url.endsWith('/ajax/admin/manage-items.php')) { posted.push({ body: opts.body, headers: opts.headers || {} }); return res({ status: 200, body: JSON.stringify({ success: true }) }); }
     return res({ status: 404 });
   });
   const out = await httpApplyPostItemConfig({
@@ -128,6 +128,7 @@ test('httpApplyPostItemConfig sets event, reads csrf, posts a quantity tier', as
   }, { fetchImpl, allowlist: new Set(['cbotriage.bid']) });
   assert.equal(out.ok, true);
   assert.equal(out.postItemConfig.applied.length, 1);
-  assert.match(posted[0], /item_id=12/);
-  assert.match(posted[0], /quantity=2/);
+  assert.match(posted[0].body, /item_id=12/);
+  assert.match(posted[0].body, /quantity=2/);
+  assert.equal(posted[0].headers['X-CSRF-TOKEN'], 'CT');
 });
