@@ -1,6 +1,6 @@
 {
   "name": "mkevent",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "QA ClickBid event creator",
   "main": "src/main/index.cjs",
   "scripts": {
