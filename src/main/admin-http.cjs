@@ -1,6 +1,8 @@
 // src/main/admin-http.cjs
 'use strict';
 
+const { buildTicketPageItemAttachmentPlans } = require('../../browser-fallback.cjs');
+
 function createJar() {
   const jar = new Map();
   return {
@@ -74,7 +76,7 @@ async function adminLogin({ fetchImpl = fetch, baseUrl, adminEmail, adminPasswor
         ...headers,
         Cookie: jar.header(),
       },
-      body: form ? new URLSearchParams(form).toString() : undefined,
+      body: form ? (form instanceof URLSearchParams ? form.toString() : new URLSearchParams(form).toString()) : undefined,
       redirect: 'manual',
     });
     jar.absorb(resp);
@@ -166,4 +168,65 @@ async function httpCreateEvent(payload, { fetchImpl = fetch, allowlist } = {}) {
   return { ok: true, eventId: id, eventSlug, eventName: e.name, adminUrl: `${base}/events/${eventSlug}` };
 }
 
-module.exports = { createJar, assertAllowed, scrapeLoginForm, scrapeOrgForm, adminLogin, httpCreateEvent, toDateOnly, digitsOnly, parseEventResult };
+function scrapeCsrfMeta(html) {
+  return (html.match(/<meta[^>]*name=["']csrf-token["'][^>]*content=["']([^"']*)["']/i)
+    || html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*name=["']csrf-token["']/i) || [])[1] || '';
+}
+
+function scrapeTicketFormId(html) {
+  return (html.match(/id=["']ticket-form-id["'][^>]*value=["']([^"']*)["']/i)
+    || html.match(/value=["']([^"']*)["'][^>]*id=["']ticket-form-id["']/i) || [])[1] || '';
+}
+
+async function httpApplyPostItemConfig(payload, { fetchImpl = fetch, allowlist } = {}) {
+  const base = String(payload.baseUrl).replace(/\/$/, '');
+  const session = await adminLogin({
+    fetchImpl, baseUrl: base, adminEmail: payload.adminEmail, adminPassword: payload.adminPassword,
+    organizationId: payload.organizationId, allowlist,
+  });
+
+  await session.request('POST', `${base}/admin/event.php`, { form: { 'event-id': String(payload.eventId) } });
+
+  const butler = await session.request('GET', `${base}/butler/event-utilities.php`);
+  const csrf = scrapeCsrfMeta(butler.body);
+
+  const applied = [], skipped = [], warnings = [];
+  const postForm = (url, form) => session.request('POST', url, {
+    form, headers: { 'X-Requested-With': 'XMLHttpRequest', ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {}) },
+  });
+
+  const quantityItems = Array.isArray(payload.quantityItems) ? payload.quantityItems : [];
+  for (const item of quantityItems) {
+    for (const tier of (Array.isArray(item.quantity_tiers) ? item.quantity_tiers : [])) {
+      const quantity = Math.max(1, Number(tier?.quantity) || 0);
+      const price = Math.max(0, Number(tier?.price) || 0);
+      if (!quantity) { skipped.push({ section: 'quantityItemTier', itemId: String(item.id), reason: 'missing quantity' }); continue; }
+      const r = await postForm(`${base}/ajax/admin/manage-items.php`, { action: 'set_item_quantity', id: 'new', quantity: String(quantity), price: String(price), item_id: String(item.id) });
+      let ok = r.status < 400;
+      try { ok = ok && JSON.parse(r.body)?.success !== false; } catch (_) {}
+      if (!ok) { warnings.push({ section: 'quantityItemTier', itemId: String(item.id), message: `tier save failed (HTTP ${r.status})` }); continue; }
+      applied.push({ section: 'quantityItemTier', itemId: String(item.id), itemName: item.item_name || 'Quantity item', quantity, price });
+    }
+  }
+
+  const donationItems = Array.isArray(payload.donationItems) ? payload.donationItems : [];
+  const plans = buildTicketPageItemAttachmentPlans(payload.ticketPages, quantityItems, donationItems);
+  for (const plan of plans) {
+    if (plan.resolvedItems.length === 0) continue;
+    const form = await session.request('GET', `${base}/admin/ticket_form.php?form_name=${encodeURIComponent(plan.formName)}`);
+    const formId = scrapeTicketFormId(form.body);
+    const body = new URLSearchParams();
+    body.append('action', 'sync-items');
+    body.append('formId', String(formId));
+    for (const it of plan.resolvedItems) body.append('itemIds[]', String(it.id));
+    const r = await postForm(`${base}/ajax/admin/ticket-form.php`, body);
+    let ok = r.status < 400;
+    try { ok = ok && JSON.parse(r.body)?.success !== false; } catch (_) {}
+    if (!ok) warnings.push({ section: 'ticketPageItems', formName: plan.formName, message: `sync-items failed (HTTP ${r.status})` });
+    else applied.push({ section: 'ticketPageItems', formName: plan.formName, itemCount: plan.resolvedItems.length });
+  }
+
+  return { ok: true, eventId: String(payload.eventId), postItemConfig: { applied, skipped, warnings } };
+}
+
+module.exports = { createJar, assertAllowed, scrapeLoginForm, scrapeOrgForm, adminLogin, httpCreateEvent, httpApplyPostItemConfig, scrapeCsrfMeta, scrapeTicketFormId, toDateOnly, digitsOnly, parseEventResult };

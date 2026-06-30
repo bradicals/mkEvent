@@ -110,3 +110,24 @@ test('httpCreateEvent throws on keyword-in-use', async () => {
     /already in use/,
   );
 });
+
+const { httpApplyPostItemConfig } = require('./admin-http.cjs');
+
+test('httpApplyPostItemConfig sets event, reads csrf, posts a quantity tier', async () => {
+  const posted = [];
+  const fetchImpl = loginScript(async (url, opts = {}) => {
+    if (url.endsWith('/admin/event.php')) return res({ status: 302, location: '/admin/welcome.php' });
+    if (url.endsWith('/butler/event-utilities.php')) return res({ status: 200, body: '<meta name="csrf-token" content="CT">' });
+    if (url.endsWith('/ajax/admin/manage-items.php')) { posted.push(opts.body); return res({ status: 200, body: JSON.stringify({ success: true }) }); }
+    return res({ status: 404 });
+  });
+  const out = await httpApplyPostItemConfig({
+    baseUrl: 'https://cbotriage.bid', organizationId: '2518', adminEmail: 'a', adminPassword: 'p',
+    eventId: '4591', quantityItems: [{ id: '12', item_name: 'Q', quantity_tiers: [{ quantity: 2, price: 50 }] }],
+    donationItems: [], ticketPages: { pages: [] },
+  }, { fetchImpl, allowlist: new Set(['cbotriage.bid']) });
+  assert.equal(out.ok, true);
+  assert.equal(out.postItemConfig.applied.length, 1);
+  assert.match(posted[0], /item_id=12/);
+  assert.match(posted[0], /quantity=2/);
+});

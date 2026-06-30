@@ -3002,6 +3002,7 @@ module.exports = {
   createBidderSessionCache,
   createTemporaryCheckoutPage,
   gotoResolvedPublicTicketPage,
+  buildTicketPageItemAttachmentPlans,
   buildTicketPageQuantityAttachmentPlans,
   chooseBidderForAuctionItem,
   filterPostCreateAuctionItems,
