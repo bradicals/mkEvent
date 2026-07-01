@@ -315,7 +315,7 @@ function WizardFooter({ step, canCreate, onBack, onNext, onSkip, onCreate }) {
       {isReview ? (
         <button className="btn btn-lime btn-lg" disabled={!canCreate} onClick={onCreate}
           title={canCreate ? 'Create event' : 'Complete Connect and Event basics first.'}>
-          <i className="fa-solid fa-rocket-launch" /> Create event
+          <i className="fa-solid fa-rocket" /> Create event
         </button>
       ) : (
         <button className="btn btn-primary" onClick={onNext}>Continue <i className="fa-solid fa-arrow-right" /></button>
@@ -374,7 +374,7 @@ function ReviewStep({ summary, cfg }) {
   return (
     <div className="review">
       <div className="review-hero">
-        <div className="review-hero-mark"><i className="fa-solid fa-rocket-launch" /></div>
+        <div className="review-hero-mark"><i className="fa-solid fa-rocket" /></div>
         <div className="review-hero-text">
           <strong>{summary.eventName || 'Untitled event'}</strong>
           <span>cbo.io/{cfg.basics.slug || '—'}</span>

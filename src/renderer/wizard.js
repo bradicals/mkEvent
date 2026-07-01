@@ -8,7 +8,7 @@ const STEPS = [
   { id: 'auction',  num: 5, icon: 'fa-sliders',       title: 'Auction settings', subtitle: 'Admin toggles applied after the event is created.' },
   { id: 'tickets',  num: 6, icon: 'fa-ticket',        title: 'Ticket pages',     subtitle: 'Ticket forms, ticket types, selections, and questions.' },
   { id: 'activity', num: 7, icon: 'fa-cart-shopping', title: 'Activity',         subtitle: 'Optional public checkout seeding for guest and sales data.' },
-  { id: 'review',   num: 8, icon: 'fa-rocket-launch', title: 'Review & create',  subtitle: 'Confirm the recipe, then build the event.' },
+  { id: 'review',   num: 8, icon: 'fa-rocket', title: 'Review & create',  subtitle: 'Confirm the recipe, then build the event.' },
 ];
 
 function basicsReady(cfg) {
