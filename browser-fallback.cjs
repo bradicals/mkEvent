@@ -210,6 +210,10 @@ async function setInputValue(page, selector, value) {
     field.value = val;
     field.dispatchEvent(new Event('input', { bubbles: true }));
     field.dispatchEvent(new Event('change', { bubbles: true }));
+    // Some admin inputs commit on blur rather than change (e.g. the fee fields),
+    // so fire blur/focusout too. Harmless for change-committed fields.
+    field.dispatchEvent(new Event('blur', { bubbles: true }));
+    field.dispatchEvent(new Event('focusout', { bubbles: true }));
   }, { sel: selector, val: stringValue }));
 
   return { selector, applied: true, value: stringValue };
@@ -431,17 +435,17 @@ async function applyAuctionSettings(page, baseUrl, eventId, settings) {
 
   if (requested.adminFeePercent) {
     try {
-      record(await setInputValue(page, '#onchange-cc_fees', requested.adminFeePercent));
+      record(await setInputValue(page, '[name="cc_fees"]', requested.adminFeePercent));
     } catch (error) {
-      warnings.push({ selector: '#onchange-cc_fees', message: error.message });
+      warnings.push({ selector: '[name="cc_fees"]', message: error.message });
     }
   }
 
   if (requested.adminFeeDescription) {
     try {
-      record(await setInputValue(page, '#onchange-cc_fee_description', requested.adminFeeDescription));
+      record(await setInputValue(page, '[name="cc_fee_description"]', requested.adminFeeDescription));
     } catch (error) {
-      warnings.push({ selector: '#onchange-cc_fee_description', message: error.message });
+      warnings.push({ selector: '[name="cc_fee_description"]', message: error.message });
     }
   }
 
