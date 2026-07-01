@@ -397,8 +397,12 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const closeSettings = () => setShowSettings(false);
   const [theme, setTheme] = useState(() => {
-    try { return window.localStorage?.getItem('mkEvent.onboarding.theme') || 'light'; }
-    catch (_) { return 'light'; }
+    let initial = 'light';
+    try { initial = window.localStorage?.getItem('mkEvent.onboarding.theme') || 'light'; }
+    catch (_) { initial = 'light'; }
+    // Apply during render so the saved theme is on the DOM before first paint (no light flash).
+    document.documentElement.setAttribute('data-theme', initial);
+    return initial;
   });
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);

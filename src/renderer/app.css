@@ -155,6 +155,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent-cyan); bo
   height: 40px; padding: 0 12px;
   border: 1px solid var(--input-border); border-radius: 8px;
   background: var(--input-bg); font-size: 14px;
+  color-scheme: var(--scheme);
   width: 100%; min-width: 0;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
