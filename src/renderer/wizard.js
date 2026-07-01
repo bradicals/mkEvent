@@ -67,4 +67,12 @@ function applyQuickStart(setCfg, preset) {
   }));
 }
 
-module.exports = { STEPS, stepReady, canCreateEvent, readyCount, QUICK_START, applyQuickStart };
+const WIZARD_API = { STEPS, stepReady, canCreateEvent, readyCount, QUICK_START, applyQuickStart };
+// ponytail: dual CJS/browser export — Vite bundles this file as a plain ES
+// module (no CJS interop for local source files), so a bare `module.exports`
+// throws `ReferenceError: module is not defined` at runtime in the renderer.
+// Node (wizard.test.js via require()) still gets module.exports as before;
+// the browser bundle reads globalThis.WIZARD instead. Mirrors the existing
+// event-model.js UMD pattern in this repo.
+if (typeof module === 'object' && module.exports) module.exports = WIZARD_API;
+if (typeof globalThis !== 'undefined') globalThis.WIZARD = WIZARD_API;
