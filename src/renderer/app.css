@@ -11,6 +11,14 @@ button, input, select, textarea { font-family: inherit; color: inherit; }
 input, select, textarea { outline: none; }
 input:focus, select:focus, textarea:focus { border-color: var(--accent-cyan); box-shadow: 0 0 0 3px rgba(0,163,255,0.18); }
 
+/* Scrollbars — thin, themed (adapts to light/dark) */
+* { scrollbar-width: thin; scrollbar-color: var(--input-border) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--input-border); border-radius: 9999px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted2); }
+::-webkit-scrollbar-corner { background: transparent; }
+
 /* ---- Top app bar ---- */
 .app-top {
   height: 64px; display: flex; align-items: center; gap: 16px;
