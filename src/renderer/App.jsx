@@ -328,6 +328,72 @@ function cloneData(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function ConnectStep({ cfg, set, switchEnv, onQuickStart, onTest, testState, testError }) {
+  const testLabel = { idle: 'Test connection', testing: 'Testing…', ok: 'Connected', fail: 'Failed' }[testState] || 'Test connection';
+  const canTest = Boolean(cfg.api.organizationId && cfg.api.orgToken) && testState !== 'testing';
+  return (
+    <>
+      <div className="quick-start">
+        <div className="quick-start-eyebrow">Quick start — prefill a recipe</div>
+        <div className="quick-start-chips">
+          {WIZARD.QUICK_START.map((p) => (
+            <button key={p.id} type="button" className="quick-chip" onClick={() => onQuickStart(p)}>
+              <span className="qc-icon"><i className={`fa-solid ${p.icon}`} /></span>
+              <span className="qc-text"><strong>{p.name}</strong><small>{p.blurb}</small></span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <EnvironmentBody data={cfg.api} set={set('api')} onSwitchEnv={switchEnv} />
+      <div className="test-panel">
+        <span className={`test-dot ${testState}`} />
+        <div className="test-text">
+          <strong>Connection</strong>
+          <small>{testState === 'ok' ? 'API responded successfully.' : testState === 'fail' ? (testError || 'Could not reach the API.') : 'Verify the org token before creating an event.'}</small>
+        </div>
+        <button className="btn btn-outline" disabled={!canTest} onClick={onTest}>
+          {testState === 'testing' ? <i className="fa-solid fa-spinner fa-spin" /> : <i className="fa-solid fa-plug-circle-check" />} {testLabel}
+        </button>
+      </div>
+    </>
+  );
+}
+
+function ReviewStep({ summary, cfg }) {
+  const rows = [
+    ['fa-server', 'Environment', cfg.api.env],
+    ['fa-signature', 'Event', summary.eventName || 'Untitled event'],
+    ['fa-link', 'Keyword', `cbo.io/${cfg.basics.slug || '—'}`],
+    ['fa-calendar', 'Schedule', cfg.basics.startDate ? `${cfg.basics.startDate} ${cfg.basics.startTime || ''}`.trim() : 'Dates not set'],
+    ['fa-users', 'Bidders', `${summary.bidderCount}`],
+    ['fa-gavel', 'Items', `${summary.itemCount} (${summary.itemBreakdown.silent}S · ${summary.itemBreakdown.live}L · ${summary.itemBreakdown.donation}D · ${summary.itemBreakdown.quantity}Q)`],
+    ['fa-ticket', 'Ticket pages', summary.ticketPages.enabled ? `${summary.ticketPages.pageCount} pages` : 'Off'],
+    ['fa-address-card', 'Contact', `${cfg.basics.contactFirstName || ''} ${cfg.basics.contactLastName || ''}`.trim() || '—'],
+  ];
+  const envSafe = Object.hasOwn(EVENT_MODEL.ENVIRONMENTS, cfg.api.env);
+  return (
+    <div className="review">
+      <div className="review-hero">
+        <div className="review-hero-mark"><i className="fa-solid fa-rocket-launch" /></div>
+        <div className="review-hero-text">
+          <strong>{summary.eventName || 'Untitled event'}</strong>
+          <span>cbo.io/{cfg.basics.slug || '—'}</span>
+        </div>
+        <span className={`review-env ${envSafe ? 'ok' : 'warn'}`}>{cfg.api.env}</span>
+      </div>
+      <div className="review-rows">
+        {rows.map(([icon, label, value]) => (
+          <div className="review-row" key={label}>
+            <span className="rr-icon"><i className={`fa-solid ${icon}`} /></span>
+            <span className="rr-label">{label}</span>
+            <span className="rr-value">{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [cfg, set, setCfg, switchEnv, saveApiProfile, loadApiProfile, deleteApiProfile] = useConfig();
   const [savedPresets, setSavedPresets] = useState(loadPresetLibrary);
@@ -514,7 +580,7 @@ function App() {
   const renderStepBody = () => {
     switch (currentStep.id) {
       case 'connect':
-        return <EnvironmentBody data={cfg.api} set={set('api')} onSwitchEnv={switchEnv} />;
+        return <ConnectStep cfg={cfg} set={set} switchEnv={switchEnv} onQuickStart={(preset) => WIZARD.applyQuickStart(setCfg, preset)} onTest={testConnection} testState={testState} testError={testError} />;
       case 'basics':
         return <BasicsBody data={cfg.basics} set={set('basics')} slugCheck={slugCheck} onCheckSlug={checkSlugAvailability} />;
       case 'bidders':
@@ -528,7 +594,7 @@ function App() {
       case 'activity':
         return <PostCreateActivityBody data={cfg.postCreateActivity} ticketPages={cfg.ticketPages} set={set('postCreateActivity')} />;
       case 'review':
-        return <div>Review coming next</div>;
+        return <ReviewStep summary={summary} cfg={cfg} />;
       default:
         return null;
     }
