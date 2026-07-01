@@ -894,6 +894,11 @@ test('admin fee opt-out defaults to false and coerces to boolean', () => {
   assert.equal(model.normalizeAuctionSettings({ allowAdminFeeOptOut: 1 }).allowAdminFeeOptOut, true);
 });
 
+test('admin fee description defaults blank and coerces to string', () => {
+  assert.equal(model.normalizeAuctionSettings().adminFeeDescription, '');
+  assert.equal(model.normalizeAuctionSettings({ adminFeeDescription: 'Admin Fees Description' }).adminFeeDescription, 'Admin Fees Description');
+});
+
 test('ticket pages default off and normalize basic/full presets for quick setup', () => {
   const off = model.normalizeTicketPages();
   assert.equal(off.enabled, false);

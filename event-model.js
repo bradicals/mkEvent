@@ -238,6 +238,7 @@
       startingBidderNumber: '',
       adminFeePercent: '',
       allowAdminFeeOptOut: false,
+      adminFeeDescription: '',
       enableCrypto: false,
       enableLink: false,
     },
@@ -453,6 +454,7 @@
       startingBidderNumber,
       adminFeePercent: normalizeAdminFeePercent(base.adminFeePercent),
       allowAdminFeeOptOut: Boolean(base.allowAdminFeeOptOut),
+      adminFeeDescription: String(base.adminFeeDescription ?? ''),
       enableCrypto: Boolean(base.enableCrypto),
       enableLink: Boolean(base.enableLink),
     };

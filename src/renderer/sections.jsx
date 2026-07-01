@@ -685,6 +685,10 @@ export function AuctionSettingsBody({ data, bidders, set }) {
           </select>
         </div>
         <div className="field">
+          <label>Admin Fees Description</label>
+          <input type="text" value={settings.adminFeeDescription || ''} onChange={e => set({ adminFeeDescription: e.target.value })} />
+        </div>
+        <div className="field">
           <label>Starting Bidder Number</label>
           <input type="number" min="1" value={effectiveStartingBidderNumber || ''} disabled={settings.syncStartingBidderNumber} onChange={e => set({ startingBidderNumber: e.target.value })} />
           <div className="help">{settings.syncStartingBidderNumber ? `Copied from Bidders start number (${bidderStart}).` : 'Custom value.'}</div>

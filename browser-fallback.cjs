@@ -437,6 +437,14 @@ async function applyAuctionSettings(page, baseUrl, eventId, settings) {
     }
   }
 
+  if (requested.adminFeeDescription) {
+    try {
+      record(await setInputValue(page, '#onchange-cc_fee_description', requested.adminFeeDescription));
+    } catch (error) {
+      warnings.push({ selector: '#onchange-cc_fee_description', message: error.message });
+    }
+  }
+
   process.stderr.write(`[fallback] Auction settings applied=${applied.length}, skipped=${skipped.length}, warnings=${warnings.length}\n`);
   return { applied, skipped, warnings };
 }
