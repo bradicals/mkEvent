@@ -246,18 +246,6 @@ function PresetNameModal({ initialName, onSave, onCancel }) {
   );
 }
 
-function ConfigToolbar({ presets, selectedPresetId, onSelectPreset, onSavePreset, onDeletePreset, onImportRecipe, onExportRecipe }) {
-  return (
-    <div className="page-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 16 }}>
-      <PresetPicker presets={presets} selectedPresetId={selectedPresetId} onSelectPreset={onSelectPreset} />
-      <button className="btn btn-outline" onClick={onSavePreset}><i className="fa-regular fa-bookmark"></i> Save preset</button>
-      <button className="btn btn-outline" disabled={!selectedPresetId} onClick={onDeletePreset}><i className="fa-regular fa-trash-can"></i> Delete preset</button>
-      <button className="btn btn-outline" onClick={onImportRecipe}><i className="fa-solid fa-file-import"></i> Import recipe</button>
-      <button className="btn btn-outline" onClick={onExportRecipe}><i className="fa-regular fa-floppy-disk"></i> Export recipe</button>
-    </div>
-  );
-}
-
 function StepRail({ cfg, slugCheck, step, onJump }) {
   const ready = WIZARD.readyCount(cfg, slugCheck);
   const pct = (step / (WIZARD.STEPS.length - 1)) * 100;
@@ -624,7 +612,6 @@ function App() {
       {runRequest && (
         <RunModal config={runRequest.config} recipe={runRequest.recipe} onClose={() => setRunRequest(null)} />
       )}
-      {/* Settings drawer stays as-is for now; extended in Task 5 */}
       {showSettings && (
         <>
           <div className="settings-backdrop" onClick={closeSettings} />
@@ -634,7 +621,35 @@ function App() {
               <button className="btn btn-ghost btn-sm" onClick={closeSettings} aria-label="Close settings"><i className="fa-solid fa-xmark" /></button>
             </div>
             <div className="settings-aside-body">
-              <SettingsBody data={cfg.api} set={set('api')} onTestConnection={testConnection} testState={testState} testError={testError} onSaveProfile={saveApiProfile} onLoadProfile={loadApiProfile} onDeleteProfile={deleteApiProfile} />
+              <section className="drawer-section">
+                <h3 className="drawer-h">Appearance</h3>
+                <div className="theme-toggle" role="group" aria-label="Theme">
+                  <button type="button" className={theme === 'light' ? 'is-active' : ''} onClick={() => setTheme('light')}>
+                    <i className="fa-solid fa-sun" /> Light
+                  </button>
+                  <button type="button" className={theme === 'dark' ? 'is-active' : ''} onClick={() => setTheme('dark')}>
+                    <i className="fa-solid fa-moon" /> Dark
+                  </button>
+                </div>
+              </section>
+
+              <section className="drawer-section">
+                <h3 className="drawer-h">Presets &amp; recipes</h3>
+                <div className="drawer-presets">
+                  <PresetPicker presets={savedPresets} selectedPresetId={selectedPresetId} onSelectPreset={loadPreset} />
+                  <div className="drawer-preset-actions">
+                    <button className="btn btn-outline btn-sm" onClick={savePreset}><i className="fa-regular fa-bookmark" /> Save preset</button>
+                    <button className="btn btn-outline btn-sm" disabled={!selectedPresetId} onClick={deletePreset}><i className="fa-regular fa-trash-can" /> Delete</button>
+                    <button className="btn btn-outline btn-sm" onClick={() => importInputRef.current?.click()}><i className="fa-solid fa-file-import" /> Import recipe</button>
+                    <button className="btn btn-outline btn-sm" onClick={exportRecipe}><i className="fa-regular fa-floppy-disk" /> Export recipe</button>
+                  </div>
+                </div>
+              </section>
+
+              <section className="drawer-section">
+                <h3 className="drawer-h">Connection</h3>
+                <SettingsBody data={cfg.api} set={set('api')} onTestConnection={testConnection} testState={testState} testError={testError} onSaveProfile={saveApiProfile} onLoadProfile={loadApiProfile} onDeleteProfile={deleteApiProfile} />
+              </section>
             </div>
           </aside>
         </>
