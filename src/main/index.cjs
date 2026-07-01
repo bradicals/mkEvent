@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, screen } = require('electron');
+const { app, BrowserWindow, Menu, dialog, screen } = require('electron');
 const path = require('path');
 const { startProxy, stopProxy, getProxyState } = require('./proxy-manager.cjs');
 
@@ -42,6 +42,25 @@ function createWindow() {
   });
 
   window.loadURL(getRendererEntry());
+
+  // Standard right-click context menu (edit actions + inspect in dev).
+  window.webContents.on('context-menu', (_event, params) => {
+    const template = [];
+    if (params.isEditable || params.selectionText) {
+      template.push(
+        { role: 'cut', enabled: params.editFlags.canCut },
+        { role: 'copy', enabled: params.editFlags.canCopy },
+        { role: 'paste', enabled: params.editFlags.canPaste },
+        { type: 'separator' },
+        { role: 'selectAll' },
+      );
+    }
+    if (isDev) {
+      if (template.length) template.push({ type: 'separator' });
+      template.push({ label: 'Inspect element', click: () => window.webContents.inspectElement(params.x, params.y) });
+    }
+    if (template.length) Menu.buildFromTemplate(template).popup({ window });
+  });
 
   if (isDev) {
     window.webContents.openDevTools({ mode: 'detach' });
