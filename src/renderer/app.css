@@ -250,25 +250,10 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent-cyan); bo
 .item-empty { padding: 28px 16px; text-align: center; color: var(--muted); font-size: 13px; border: 1px dashed #cbd5e1; border-radius: 12px; background: var(--test-bg); }
 .item-empty i { display: block; font-size: 24px; color: #cbd5e1; margin-bottom: 8px; }
 
-/* Footer action bar */
-.app-foot {
-  position: sticky; bottom: 0; z-index: 25;
-  background: var(--card-bg); backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-top: 1px solid var(--input-border);
-  padding: 14px 24px;
-  display: flex; align-items: center; gap: 16px;
-  box-shadow: 0 -8px 24px -16px rgba(7,82,156,0.18);
-}
-.app-foot .summary { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-.app-foot .summary strong { color: var(--heading); font-weight: 600; }
-.app-foot .summary .dot-sep { color: #cbd5e1; }
-.app-foot .grow { flex: 1; }
-
 /* Run console (modal overlay) */
 .run-overlay {
   position: fixed; inset: 0; z-index: 100;
-  background: rgba(15,23,42,0.55);
+  background: rgba(4,20,38,0.6);
   display: flex; align-items: center; justify-content: center;
   padding: 32px;
   animation: fadeIn 0.2s ease;
@@ -480,7 +465,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent-cyan); bo
 .ticket-url-preview .muted {
   color: var(--muted2);
 }
-.app-foot .summary .summary-url { color: #2563eb; }
 
 /* ---- Onboarding wizard ---- */
 .wizard { display: grid; grid-template-columns: 262px 1fr; min-height: calc(100vh - 64px); }
@@ -515,7 +499,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent-cyan); bo
   .wiz-main { padding: 24px 18px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .wiz-progress .bar, .switch, .switch::after { transition: none; }
+  .wiz-progress .bar, .switch, .switch::after,
+  .settings-aside, .run-overlay, .run-progress .bar { animation: none !important; transition: none !important; }
 }
 
 /* Connect step */
