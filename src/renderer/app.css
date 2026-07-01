@@ -252,12 +252,12 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent-cyan); bo
 .item-row .item-del { color: var(--muted2); background: transparent; border: none; cursor: pointer; padding: 6px; border-radius: 6px; }
 .item-row .item-del:hover { background: #fef2f2; color: #b91c1c; }
 
-.item-add-bar { display: flex; gap: 8px; flex-wrap: wrap; padding: 10px; border: 1px dashed #cbd5e1; border-radius: 12px; background: var(--card-bg); }
+.item-add-bar { display: flex; gap: 8px; flex-wrap: wrap; padding: 10px; border: 1px dashed var(--input-border); border-radius: 12px; background: var(--card-bg); }
 .item-add-bar .btn { flex: 1; min-width: 130px; }
 .item-add-bar .btn i { color: var(--color-brand-primary-500); }
 
-.item-empty { padding: 28px 16px; text-align: center; color: var(--muted); font-size: 13px; border: 1px dashed #cbd5e1; border-radius: 12px; background: var(--test-bg); }
-.item-empty i { display: block; font-size: 24px; color: #cbd5e1; margin-bottom: 8px; }
+.item-empty { padding: 28px 16px; text-align: center; color: var(--muted); font-size: 13px; border: 1px dashed var(--input-border); border-radius: 12px; background: var(--test-bg); }
+.item-empty i { display: block; font-size: 24px; color: var(--muted2); margin-bottom: 8px; }
 
 /* Run console (modal overlay) */
 .run-overlay {
@@ -336,6 +336,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent-cyan); bo
 .callout.warn { background: #fefce8; border-color: #fde68a; color: #854d0e; }
 .callout i { color: var(--color-brand-primary-500); margin-top: 2px; }
 .callout.warn i { color: #ca8a04; }
+/* Dark-mode callouts: translucent tint + light text for readable contrast on dark surfaces. */
+[data-theme="dark"] .callout { background: rgba(0, 163, 255, 0.12); border-color: rgba(0, 163, 255, 0.35); color: #bfe4ff; }
+[data-theme="dark"] .callout i { color: #57c0ff; }
+[data-theme="dark"] .callout.warn { background: rgba(234, 179, 8, 0.12); border-color: rgba(234, 179, 8, 0.40); color: #f3d68a; }
+[data-theme="dark"] .callout.warn i { color: #f3d68a; }
 .code-inline { font-family: var(--font-mono); background: var(--chip-bg); padding: 1px 6px; border-radius: 4px; font-size: 12px; color: var(--label); }
 
 .attachment-picker {
