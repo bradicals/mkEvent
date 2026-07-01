@@ -93,7 +93,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent-cyan); bo
   cursor: pointer;
 }
 .preset-picker-item:hover { background: var(--prefix-bg); }
-.preset-picker-item.is-active { background: #e0f2fe; color: #07529c; font-weight: 600; }
+.preset-picker-item.is-active { background: var(--chip-bg); color: var(--chip-fg); font-weight: 600; }
 
 /* ---- Card (collapsible section) ---- */
 .section {
@@ -166,7 +166,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent-cyan); bo
 .field .with-suffix { position: relative; }
 .field .with-suffix input { padding-right: 40px; }
 .field .with-suffix .suffix-btn { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--muted2); padding: 4px 8px; font-size: 14px; border-radius: 4px; display: flex; align-items: center; justify-content: center; transition: color 0.15s, background 0.15s; }
-.field .with-suffix .suffix-btn:hover { color: #6366f1; background: #eef2ff; }
+.field .with-suffix .suffix-btn:hover { color: var(--accent-cyan); background: var(--chip-bg); }
 
 .section-pane-stack { display: flex; flex-direction: column; gap: 16px; }
 .section-pane-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
@@ -189,7 +189,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent-cyan); bo
   display: inline-flex; align-items: center; justify-content: center;
   font-size: 11px; font-weight: 700;
 }
-.section-tab.is-active .section-tab-badge { background: #c7ecff; color: #07529c; }
+.section-tab.is-active .section-tab-badge { background: var(--chip-bg); color: var(--chip-fg); }
 .exact-record-stack { display: flex; flex-direction: column; gap: 12px; }
 .exact-record-card {
   border: 1px solid var(--input-border); border-radius: 14px; background: var(--test-bg);
@@ -234,7 +234,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent-cyan); bo
 /* Item rows */
 .item-stack { display: flex; flex-direction: column; gap: 10px; }
 .item-row { display: grid; grid-template-columns: 44px 1fr 140px 110px 90px 36px; gap: 12px; align-items: center; padding: 10px; border: 1px solid var(--card-border); border-radius: 12px; background: var(--test-bg); }
-.item-row .item-thumb { width: 44px; height: 44px; border-radius: 9px; background: linear-gradient(135deg, #e0f2fe, #ddd6fe); display: flex; align-items: center; justify-content: center; color: #0369a1; font-size: 18px; }
+.item-row .item-thumb { width: 44px; height: 44px; border-radius: 9px; background: var(--chip-bg); display: flex; align-items: center; justify-content: center; color: var(--chip-fg); font-size: 18px; }
 .item-row .item-name { font-size: 14px; font-weight: 600; color: var(--heading); }
 .item-row .item-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .item-row .item-cat { font-size: 12px; color: var(--muted); padding: 4px 10px; background: var(--chip-bg); border-radius: 9999px; text-align: center; }
@@ -454,7 +454,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent-cyan); bo
 .ticket-url-preview {
   margin-top: 6px;
   font-size: 13px;
-  color: #475569;
+  color: var(--muted);
 }
 .ticket-url-preview code {
   background: var(--chip-bg);
