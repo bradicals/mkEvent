@@ -7,7 +7,8 @@ const children = [];
 function spawnChild(command, args, options = {}) {
   const child = spawn(command, args, {
     stdio: 'inherit',
-    shell: false,
+    // Windows: Node refuses to spawn .cmd/.bat shims (npm.cmd, npx.cmd) without a shell.
+    shell: process.platform === 'win32',
     ...options,
   });
   children.push(child);
