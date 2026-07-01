@@ -210,6 +210,10 @@ async function setInputValue(page, selector, value) {
     field.value = val;
     field.dispatchEvent(new Event('input', { bubbles: true }));
     field.dispatchEvent(new Event('change', { bubbles: true }));
+    // Some admin inputs commit on blur rather than change (e.g. the fee fields),
+    // so fire blur/focusout too. Harmless for change-committed fields.
+    field.dispatchEvent(new Event('blur', { bubbles: true }));
+    field.dispatchEvent(new Event('focusout', { bubbles: true }));
   }, { sel: selector, val: stringValue }));
 
   return { selector, applied: true, value: stringValue };
@@ -400,6 +404,7 @@ async function applyAuctionSettings(page, baseUrl, eventId, settings) {
     ['#onchange-enable_ttr', boolValue(requested.enableTextToRegister)],
     ['#onchange-require_address', boolValue(requested.requireAddress)],
     ['#onchange-require_cc', boolValue(requested.requireCreditCard)],
+    ['#onchange-cc_fee_optout', boolValue(requested.allowAdminFeeOptOut)],
     ['#enable-crypto', boolValue(requested.enableCrypto)],
     ['#enable-link', boolValue(requested.enableLink)],
   ];
@@ -425,6 +430,22 @@ async function applyAuctionSettings(page, baseUrl, eventId, settings) {
       record(await setInputValue(page, '#onchange-start_bidder_number', requested.startingBidderNumber));
     } catch (error) {
       warnings.push({ selector: '#onchange-start_bidder_number', message: error.message });
+    }
+  }
+
+  if (requested.adminFeePercent) {
+    try {
+      record(await setInputValue(page, '[name="cc_fees"]', requested.adminFeePercent));
+    } catch (error) {
+      warnings.push({ selector: '[name="cc_fees"]', message: error.message });
+    }
+  }
+
+  if (requested.adminFeeDescription) {
+    try {
+      record(await setInputValue(page, '[name="cc_fee_description"]', requested.adminFeeDescription));
+    } catch (error) {
+      warnings.push({ selector: '[name="cc_fee_description"]', message: error.message });
     }
   }
 

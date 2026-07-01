@@ -236,6 +236,9 @@
       requireCreditCard: true,
       syncStartingBidderNumber: true,
       startingBidderNumber: '',
+      adminFeePercent: '',
+      allowAdminFeeOptOut: false,
+      adminFeeDescription: '',
       enableCrypto: false,
       enableLink: false,
     },
@@ -421,6 +424,15 @@
     };
   }
 
+  // Blank = no fee (leave ClickBid default); otherwise a non-negative number as a
+  // string (decimals allowed, e.g. "3.63"). Invalid/negative input falls back to blank.
+  function normalizeAdminFeePercent(value) {
+    const raw = String(value ?? '').trim();
+    if (raw === '') return '';
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 0 ? String(n) : '';
+  }
+
   function normalizeAuctionSettings(section, bidderSection) {
     const defaults = DEFAULT_CONFIG.auctionSettings;
     const base = section || {};
@@ -440,6 +452,9 @@
       requireCreditCard: base.requireCreditCard !== undefined ? Boolean(base.requireCreditCard) : defaults.requireCreditCard,
       syncStartingBidderNumber: base.syncStartingBidderNumber !== false,
       startingBidderNumber,
+      adminFeePercent: normalizeAdminFeePercent(base.adminFeePercent),
+      allowAdminFeeOptOut: Boolean(base.allowAdminFeeOptOut),
+      adminFeeDescription: String(base.adminFeeDescription ?? ''),
       enableCrypto: Boolean(base.enableCrypto),
       enableLink: Boolean(base.enableLink),
     };
