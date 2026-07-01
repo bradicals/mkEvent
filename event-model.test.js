@@ -878,6 +878,22 @@ test('auction settings default to assigning merchant account and syncing bidder 
   assert.equal(exported.auctionSettings.startingBidderNumber, '432');
 });
 
+test('admin fee percent: blank default, keeps valid decimals, rejects negative/garbage', () => {
+  assert.equal(model.normalizeAuctionSettings().adminFeePercent, '');
+  assert.equal(model.normalizeAuctionSettings({ adminFeePercent: '' }).adminFeePercent, '');
+  assert.equal(model.normalizeAuctionSettings({ adminFeePercent: '3.63' }).adminFeePercent, '3.63');
+  assert.equal(model.normalizeAuctionSettings({ adminFeePercent: 5 }).adminFeePercent, '5');
+  assert.equal(model.normalizeAuctionSettings({ adminFeePercent: '  2.5 ' }).adminFeePercent, '2.5');
+  assert.equal(model.normalizeAuctionSettings({ adminFeePercent: '-1' }).adminFeePercent, '');
+  assert.equal(model.normalizeAuctionSettings({ adminFeePercent: 'abc' }).adminFeePercent, '');
+});
+
+test('admin fee opt-out defaults to false and coerces to boolean', () => {
+  assert.equal(model.normalizeAuctionSettings().allowAdminFeeOptOut, false);
+  assert.equal(model.normalizeAuctionSettings({ allowAdminFeeOptOut: true }).allowAdminFeeOptOut, true);
+  assert.equal(model.normalizeAuctionSettings({ allowAdminFeeOptOut: 1 }).allowAdminFeeOptOut, true);
+});
+
 test('ticket pages default off and normalize basic/full presets for quick setup', () => {
   const off = model.normalizeTicketPages();
   assert.equal(off.enabled, false);

@@ -400,6 +400,7 @@ async function applyAuctionSettings(page, baseUrl, eventId, settings) {
     ['#onchange-enable_ttr', boolValue(requested.enableTextToRegister)],
     ['#onchange-require_address', boolValue(requested.requireAddress)],
     ['#onchange-require_cc', boolValue(requested.requireCreditCard)],
+    ['#onchange-cc_fee_optout', boolValue(requested.allowAdminFeeOptOut)],
     ['#enable-crypto', boolValue(requested.enableCrypto)],
     ['#enable-link', boolValue(requested.enableLink)],
   ];
@@ -425,6 +426,14 @@ async function applyAuctionSettings(page, baseUrl, eventId, settings) {
       record(await setInputValue(page, '#onchange-start_bidder_number', requested.startingBidderNumber));
     } catch (error) {
       warnings.push({ selector: '#onchange-start_bidder_number', message: error.message });
+    }
+  }
+
+  if (requested.adminFeePercent) {
+    try {
+      record(await setInputValue(page, '#onchange-cc_fees', requested.adminFeePercent));
+    } catch (error) {
+      warnings.push({ selector: '#onchange-cc_fees', message: error.message });
     }
   }
 

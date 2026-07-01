@@ -673,6 +673,18 @@ export function AuctionSettingsBody({ data, bidders, set }) {
           <div className="help">Yes requires a configured Stripe merchant account.</div>
         </div>
         <div className="field">
+          <label>Admin Fee (%)</label>
+          <input type="number" min="0" step="0.01" value={settings.adminFeePercent || ''} onChange={e => set({ adminFeePercent: e.target.value })} />
+          <div className="help">Blank = no fee. Credit-card admin fee passed to bidders.</div>
+        </div>
+        <div className="field">
+          <label>Allow Guest to Optout of Admin Fees?</label>
+          <select value={settings.allowAdminFeeOptOut ? '1' : '0'} onChange={e => set({ allowAdminFeeOptOut: e.target.value === '1' })}>
+            <option value="1">Yes</option>
+            <option value="0">No</option>
+          </select>
+        </div>
+        <div className="field">
           <label>Starting Bidder Number</label>
           <input type="number" min="1" value={effectiveStartingBidderNumber || ''} disabled={settings.syncStartingBidderNumber} onChange={e => set({ startingBidderNumber: e.target.value })} />
           <div className="help">{settings.syncStartingBidderNumber ? `Copied from Bidders start number (${bidderStart}).` : 'Custom value.'}</div>
