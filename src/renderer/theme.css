@@ -1,0 +1,126 @@
+/* =========================================================================
+   mkEvent — Onboarding wizard theme tokens (Light + Dark)
+   Grounded in the ClickBid Design System (cyan / lime / navy, Inter).
+
+   Usage:
+   1. Import this once at the app root (e.g. in src/renderer/app.css:
+        @import './theme.css';
+   2. Put data-theme on a top-level element and flip it:
+        <div id="app" data-theme="light|dark">
+      Persist the choice in localStorage (key: mkEvent.onboarding.theme).
+   3. Style every surface with the var(--*) tokens below instead of
+      hard-coded hex, so both themes come "for free".
+   ========================================================================= */
+
+:root,
+[data-theme="light"] {
+  /* Brand accents — identical in both themes */
+  --accent-cyan:        #00a3ff;   /* primary action / focus ring / active step */
+  --accent-lime:        #7bc122;   /* Create CTA / success progress */
+  --accent-navy:        #07529c;
+
+  /* Surfaces */
+  --bg:            #f6f8fb;   /* main content area */
+  --topbar-bg:     #ffffff;
+  --topbar-border: #eef2f7;
+  --rail-bg:       #ffffff;   /* step rail */
+  --rail-border:   #eef2f7;
+  --track:         #eef2f7;   /* progress-bar track */
+  --card-bg:       #ffffff;
+  --card-border:   #eef2f7;
+  --card-shadow:   0 18px 38px -28px rgba(7, 82, 156, 0.15);
+  --input-bg:      #ffffff;
+  --input-border:  #dbe4ee;
+  --prefix-bg:     #f8fafc;   /* "cbo.io/" slug prefix cell */
+  --test-bg:       #f8fafc;   /* connection-status panel */
+
+  /* Text */
+  --text:          #1f2937;   /* body / input text */
+  --heading:       #043059;   /* h1 / titles (navy-700) */
+  --label:         #334155;   /* field labels */
+  --muted:         #64748b;   /* subtitles / helper */
+  --muted2:        #94a3b8;   /* eyebrow labels / captions */
+  --eyebrow:       #0080cc;   /* "STEP 1 OF 7" / ghost links (cyan-600) */
+  --divider:       #f1f5f9;
+
+  /* Chips / small accents */
+  --chip-bg:       #f1f5f9;
+  --chip-fg:       #0080cc;
+
+  /* Semantic — success block on the run overlay */
+  --ok-bg:         #f0fdf4;
+  --ok-border:     #bbf7d0;
+  --ok-fg:         #166534;
+  --req:           #dc2626;   /* required-field asterisk */
+
+  /* Misc */
+  --scheme:        light;     /* used as `color-scheme: var(--scheme)` on inputs */
+  --on-accent:     #ffffff;   /* text placed on cyan / lime buttons */
+}
+
+[data-theme="dark"] {
+  --accent-cyan:        #00a3ff;
+  --accent-lime:        #7bc122;
+  --accent-navy:        #07529c;
+
+  --bg:            #0c2137;
+  --topbar-bg:     #0a1f33;
+  --topbar-border: #16324d;
+  --rail-bg:       #0a1d31;
+  --rail-border:   #16324d;
+  --track:         rgba(255, 255, 255, 0.08);
+  --card-bg:       #0e2740;
+  --card-border:   #1c3d5c;
+  --card-shadow:   0 20px 40px -30px rgba(0, 0, 0, 0.7);
+  --input-bg:      #0b2237;
+  --input-border:  #24466a;
+  --prefix-bg:     #0a1d31;
+  --test-bg:       rgba(255, 255, 255, 0.03);
+
+  --text:          #e6eef7;
+  --heading:       #ffffff;
+  --label:         #b8c8da;
+  --muted:         #9fb4c8;
+  --muted2:        #7f97ac;
+  --eyebrow:       #57c0ff;
+  --divider:       #1c3d5c;
+
+  --chip-bg:       #16324d;
+  --chip-fg:       #57c0ff;
+
+  --ok-bg:         rgba(123, 193, 34, 0.12);
+  --ok-border:     rgba(123, 193, 34, 0.40);
+  --ok-fg:         #a9e06d;
+  --req:           #f87171;
+
+  --scheme:        dark;
+  --on-accent:     #04263f;   /* navy text reads better on cyan/lime in dark */
+}
+
+/* ---- A few state-dependent recipes that can't be a single token ----------
+   These differ per element STATE (active/complete/on-off), so compute the
+   final value in JS or with modifier classes. Reference values: */
+
+/* Focus ring (both themes): */
+/*   border-color: var(--accent-cyan);
+     box-shadow: 0 0 0 3px rgba(0,163,255,0.18); */
+
+/* Step rail item — ACTIVE:
+     light  background: #e3f6ff;  circle bg #00a3ff / #fff;  title #043059
+     dark   background: rgba(0,163,255,.14); circle #00a3ff / #04263f; title #fff
+   left-border: 3px solid var(--accent-cyan) when active, transparent otherwise.
+
+   Step rail circle — COMPLETE (check icon):
+     light  bg #dcfce7  fg #16a34a
+     dark   bg rgba(123,193,34,.22)  fg #a9e06d
+
+   Toggle switch — ON:  track var(--accent-cyan), knob #fff.
+   Toggle switch — OFF: track (light) #cbd5e1 / (dark) #3a5878, knob #fff.
+
+   Slug status badge bg/fg:
+     ok       #16a34a on #f0fdf4
+     checking #0080cc on #eff6ff  (fa-spinner fa-spin)
+     taken    #dc2626 on #fef2f2
+     invalid  #dc2626 on #fef2f2
+     idle     var(--muted2) on var(--prefix-bg)  (fa-keyboard)
+*/

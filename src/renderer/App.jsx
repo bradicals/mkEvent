@@ -373,6 +373,14 @@ function App() {
   const [slugCheck, setSlugCheck] = useState({ state: 'idle', slug: '', message: '' });
   const [showSettings, setShowSettings] = useState(false);
   const closeSettings = () => setShowSettings(false);
+  const [theme, setTheme] = useState(() => {
+    try { return window.localStorage?.getItem('mkEvent.onboarding.theme') || 'light'; }
+    catch (_) { return 'light'; }
+  });
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    try { window.localStorage?.setItem('mkEvent.onboarding.theme', theme); } catch (_) { /* ignore */ }
+  }, [theme]);
   useEffect(() => { setTestState('idle'); setTestError(''); },
     [cfg.api.env, cfg.api.organizationId, cfg.api.orgToken, cfg.api.baseUrl]);
   useEffect(() => { setSlugCheck({ state: 'idle', slug: '', message: '' }); },
