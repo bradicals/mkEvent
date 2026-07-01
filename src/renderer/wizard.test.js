@@ -8,8 +8,8 @@ const baseCfg = () => ({
     name: '', slug: '', startDate: '', endDate: '', onCallDate: '',
     contactFirstName: '', contactLastName: '', contactEmail: '', contactPhone: '',
   },
-  bidders: { bulk: { count: 5 } },
-  items: { bulk: { silentCount: 5, liveCount: 0, donationCount: 0, quantityCount: 0 } },
+  bidders: { bulk: { count: 5, startNum: 100, emailDomain: 'example.com' } },
+  items: { bulk: { silentCount: 5, liveCount: 0, donationCount: 0, quantityCount: 0, startNum: 1, namePrefix: 'QA Item' } },
 });
 
 const fullBasics = {
@@ -70,4 +70,8 @@ test('applyQuickStart merges counts into bulk shapes', () => {
   assert.equal(cfg.items.bulk.silentCount, 180);
   // untouched sibling fields preserved
   assert.equal(cfg.items.bulk.quantityCount, 0);
+  assert.equal(cfg.bidders.bulk.startNum, 100);
+  assert.equal(cfg.bidders.bulk.emailDomain, 'example.com');
+  assert.equal(cfg.items.bulk.startNum, 1);
+  assert.equal(cfg.items.bulk.namePrefix, 'QA Item');
 });
