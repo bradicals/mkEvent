@@ -421,7 +421,7 @@ code, kbd, pre { background: var(--chip-bg); border-color: var(--card-border); c
   background: var(--card-bg); border: 1px solid var(--accent-cyan); border-radius: 14px;
   box-shadow: var(--card-shadow);
   font-size: 13px; color: var(--text); line-height: 1.5;
-  animation: coachIn 0.25s ease;
+  animation: coach-in 0.25s ease;
 }
 .coach-arrow {
   position: absolute; top: -7px; right: 24px; width: 12px; height: 12px;
@@ -434,7 +434,7 @@ code, kbd, pre { background: var(--chip-bg); border-color: var(--card-border); c
 .coach-mark ol { margin: 0 0 12px; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
 .coach-path { display: block; margin-top: 2px; font-size: 12px; color: var(--muted); }
 .coach-actions { display: flex; gap: 8px; }
-@keyframes coachIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@keyframes coach-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 
 /* In-drawer setup checklist + current-step highlights */
 .setup-checklist { border: 1px solid var(--accent-cyan); border-radius: 12px; padding: 12px 14px; background: color-mix(in srgb, var(--accent-cyan) 6%, var(--card-bg)); display: flex; flex-direction: column; gap: 8px; }
@@ -446,9 +446,9 @@ code, kbd, pre { background: var(--chip-bg); border-color: var(--card-border); c
 .setup-step.done { color: var(--muted2); text-decoration: line-through; }
 .setup-step.done .num { background: color-mix(in srgb, var(--accent-lime) 22%, transparent); color: var(--ok-fg); }
 .coach-inline { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--accent-cyan); }
-.field.is-guided input { border-color: var(--accent-cyan); animation: guidePulse 1.6s ease-in-out infinite; }
-.guide-pulse { border-color: var(--accent-cyan) !important; animation: guidePulse 1.6s ease-in-out infinite; }
-@keyframes guidePulse { 0%, 100% { box-shadow: 0 0 0 3px rgba(0,163,255,0.18); } 50% { box-shadow: 0 0 0 7px rgba(0,163,255,0.3); } }
+.field.is-guided input { border-color: var(--accent-cyan); animation: guide-pulse 1.6s ease-in-out infinite; }
+.guide-pulse { border-color: var(--accent-cyan) !important; animation: guide-pulse 1.6s ease-in-out infinite; }
+@keyframes guide-pulse { 0%, 100% { box-shadow: 0 0 0 3px rgba(0,163,255,0.18); } 50% { box-shadow: 0 0 0 7px rgba(0,163,255,0.3); } }
 
 /* Settings drawer */
 .settings-backdrop {

@@ -1349,7 +1349,9 @@ export function SettingsBody({ data, set, onTestConnection, testState, testError
   const guideSteps = guide ? [
     { key: 'org', label: 'Enter your Organization ID', done: Boolean(data.organizationId) },
     { key: 'token', label: 'Paste your Organization API token', done: Boolean(data.orgToken) },
-    { key: 'creds', label: 'Enter your admin login credentials', done: Boolean(data.adminEmail && data.adminPassword) },
+    // Optional: also checks off once the user moves on (test/save) so empty
+    // fallback credentials never strand the highlight.
+    { key: 'creds', label: 'Enter your admin login credentials (optional)', done: Boolean((data.adminEmail && data.adminPassword) || testState === 'ok' || data.selectedProfileId) },
     { key: 'test', label: 'Test the connection', done: testState === 'ok' },
     { key: 'save', label: 'Save the profile for later', done: Boolean(data.selectedProfileId) },
   ] : null;
@@ -1428,16 +1430,6 @@ export function SettingsBody({ data, set, onTestConnection, testState, testError
           placeholder="Optional label like Main Stage Org"
         />
       </div>
-      <div className="field span-full" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }} ref={el => { guideRefs.current.save = el; }}>
-        <button className={`btn btn-outline ${guideStep === 'save' ? 'guide-pulse' : ''}`} disabled={!data.organizationId || !data.orgToken} onClick={onSaveProfile}>
-          <i className="fa-regular fa-floppy-disk"></i>
-          {data.selectedProfileId ? ' Save profile' : ' Save current org profile'}
-        </button>
-        <button className="btn btn-outline" disabled={!data.selectedProfileId} onClick={() => onDeleteProfile?.(data.selectedProfileId)}>
-          <i className="fa-regular fa-trash-can"></i>
-          Delete selected profile
-        </button>
-      </div>
       <div className={`field ${guideStep === 'org' ? 'is-guided' : ''}`} ref={el => { guideRefs.current.org = el; }}>
         <label>Organization ID <span className="req">*</span></label>
         <input type="text" value={data.organizationId} onChange={e => set({ organizationId: e.target.value })} placeholder="Org ID or organization slug" />
@@ -1493,6 +1485,16 @@ export function SettingsBody({ data, set, onTestConnection, testState, testError
         </button>
         {testState === 'ok' && <span style={{ color: '#166534', fontWeight: 600 }}>✓ Connected to {data.env} / org {data.organizationId}</span>}
         {testState === 'fail' && testError && <span style={{ color: '#b91c1c' }}>{testError}</span>}
+      </div>
+      <div className="field span-full" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }} ref={el => { guideRefs.current.save = el; }}>
+        <button className={`btn btn-outline ${guideStep === 'save' ? 'guide-pulse' : ''}`} disabled={!data.organizationId || !data.orgToken} onClick={onSaveProfile}>
+          <i className="fa-regular fa-floppy-disk"></i>
+          {data.selectedProfileId ? ' Save profile' : ' Save current org profile'}
+        </button>
+        <button className="btn btn-outline" disabled={!data.selectedProfileId} onClick={() => onDeleteProfile?.(data.selectedProfileId)}>
+          <i className="fa-regular fa-trash-can"></i>
+          Delete selected profile
+        </button>
       </div>
       <div className="field span-full">
         <div className="callout">
