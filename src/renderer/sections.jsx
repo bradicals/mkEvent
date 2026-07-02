@@ -1347,6 +1347,7 @@ export function SettingsBody({ data, set, onTestConnection, testState, testError
   // First-run guided checklist: steps check off from live state; the current
   // step's control gets a pulse highlight and is scrolled into view.
   const guideSteps = guide ? [
+    { key: 'org', label: 'Enter your Organization ID', done: Boolean(data.organizationId) },
     { key: 'token', label: 'Paste your Organization API token', done: Boolean(data.orgToken) },
     { key: 'creds', label: 'Enter your admin login credentials', done: Boolean(data.adminEmail && data.adminPassword) },
     { key: 'test', label: 'Test the connection', done: testState === 'ok' },
@@ -1436,6 +1437,11 @@ export function SettingsBody({ data, set, onTestConnection, testState, testError
           <i className="fa-regular fa-trash-can"></i>
           Delete selected profile
         </button>
+      </div>
+      <div className={`field ${guideStep === 'org' ? 'is-guided' : ''}`} ref={el => { guideRefs.current.org = el; }}>
+        <label>Organization ID <span className="req">*</span></label>
+        <input type="text" value={data.organizationId} onChange={e => set({ organizationId: e.target.value })} placeholder="Org ID or organization slug" />
+        <div className="help">Same value as the Connect step — needed before the connection test.</div>
       </div>
       <div className={`field ${guideStep === 'token' ? 'is-guided' : ''}`} ref={el => { guideRefs.current.token = el; }}>
         <label>Org bearer token <span className="req">*</span></label>
