@@ -316,21 +316,27 @@ function cloneData(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function ConnectStep({ cfg, set, switchEnv, onQuickStart, onTest, testState, testError }) {
+function ConnectStep({ cfg, set, switchEnv, onQuickStart, activeQuickStart, onTest, testState, testError }) {
   const testLabel = { idle: 'Test connection', testing: 'Testing…', ok: 'Connected', fail: 'Failed' }[testState] || 'Test connection';
   const canTest = Boolean(cfg.api.organizationId && cfg.api.orgToken) && testState !== 'testing';
+  const activePreset = WIZARD.QUICK_START.find((p) => p.id === activeQuickStart);
   return (
     <>
       <div className="quick-start">
         <div className="quick-start-eyebrow">Quick start — prefill a recipe</div>
         <div className="quick-start-chips">
           {WIZARD.QUICK_START.map((p) => (
-            <button key={p.id} type="button" className="quick-chip" onClick={() => onQuickStart(p)}>
+            <button key={p.id} type="button" className={`quick-chip ${activeQuickStart === p.id ? 'is-active' : ''}`} onClick={() => onQuickStart(p)}>
               <span className="qc-icon"><i className={`fa-solid ${p.icon}`} /></span>
               <span className="qc-text"><strong>{p.name}</strong><small>{p.blurb}</small></span>
             </button>
           ))}
         </div>
+        {activePreset && (
+          <div className="quick-start-note">
+            <i className="fa-solid fa-circle-check" /> Applied <strong>{activePreset.name}</strong> — bidder and item counts are prefilled. Review or tweak them on the Bidders and Items steps.
+          </div>
+        )}
       </div>
       <EnvironmentBody data={cfg.api} set={set('api')} onSwitchEnv={switchEnv} />
       <div className="test-panel">
@@ -395,6 +401,7 @@ function App() {
   const currentStep = WIZARD.STEPS[step];
   const goto = (n) => setStep(Math.max(0, Math.min(WIZARD.STEPS.length - 1, n)));
   const [showSettings, setShowSettings] = useState(false);
+  const [quickStartId, setQuickStartId] = useState('');
   const closeSettings = () => setShowSettings(false);
   const [theme, setTheme] = useState(() => {
     let initial = 'light';
@@ -572,7 +579,7 @@ function App() {
   const renderStepBody = () => {
     switch (currentStep.id) {
       case 'connect':
-        return <ConnectStep cfg={cfg} set={set} switchEnv={switchEnv} onQuickStart={(preset) => WIZARD.applyQuickStart(setCfg, preset)} onTest={testConnection} testState={testState} testError={testError} />;
+        return <ConnectStep cfg={cfg} set={set} switchEnv={switchEnv} onQuickStart={(preset) => { WIZARD.applyQuickStart(setCfg, preset); setQuickStartId(preset.id); }} activeQuickStart={quickStartId} onTest={testConnection} testState={testState} testError={testError} />;
       case 'basics':
         return <BasicsBody data={cfg.basics} set={set('basics')} slugCheck={slugCheck} onCheckSlug={checkSlugAvailability} />;
       case 'bidders':

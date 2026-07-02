@@ -572,10 +572,10 @@ export function AuctionSettingsBody({ data, bidders, set }) {
   return (
     <div className="section-pane-stack">
       <div className="field span-full">
-        <div className="toggle-row" style={{ padding: '10px 14px', borderRadius: 8, background: settings.enabled ? '#eff6ff' : 'transparent', border: settings.enabled ? '1px solid #bfdbfe' : '1px solid transparent' }}>
+        <div className={`toggle-row master ${settings.enabled ? 'is-enabled' : ''}`}>
           <div>
             <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>
-              <i className="fa-solid fa-sliders" style={{ color: settings.enabled ? '#2563eb' : '#94a3b8', marginRight: 6 }}></i>
+              <i className="fa-solid fa-sliders" style={{ color: settings.enabled ? 'var(--accent-cyan)' : 'var(--muted2)', marginRight: 6 }}></i>
               Apply post-create auction settings
             </div>
             <div className="sub">Uses the logged-in admin browser fallback session after the event is created. Turn this off to leave ClickBid defaults unchanged.</div>
@@ -921,10 +921,10 @@ export function TicketPagesBody({ data, items, set, basics = {}, api = {} }) {
   return (
     <div className="section-pane-stack">
       <div className="field span-full">
-        <div className="toggle-row" style={{ padding: '10px 14px', borderRadius: 8, background: ticketPages.enabled ? '#eff6ff' : 'transparent', border: ticketPages.enabled ? '1px solid #bfdbfe' : '1px solid transparent' }}>
+        <div className={`toggle-row master ${ticketPages.enabled ? 'is-enabled' : ''}`}>
           <div>
             <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>
-              <i className="fa-solid fa-ticket" style={{ color: ticketPages.enabled ? '#2563eb' : '#94a3b8', marginRight: 6 }}></i>
+              <i className="fa-solid fa-ticket" style={{ color: ticketPages.enabled ? 'var(--accent-cyan)' : 'var(--muted2)', marginRight: 6 }}></i>
               Configure ticket pages after event creation
             </div>
             <div className="sub">Quick event setup only. Runtime application will use the admin/browser fallback session in the next phase.</div>
@@ -1147,10 +1147,10 @@ export function PostCreateActivityBody({ data, ticketPages, set }) {
   return (
     <div className="section-pane-stack">
       <div className="field span-full">
-        <div className="toggle-row" style={{ padding: '10px 14px', borderRadius: 8, background: activity.enabled ? '#eff6ff' : 'transparent', border: activity.enabled ? '1px solid #bfdbfe' : '1px solid transparent' }}>
+        <div className={`toggle-row master ${activity.enabled ? 'is-enabled' : ''}`}>
           <div>
             <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>
-              <i className="fa-solid fa-cart-shopping" style={{ color: activity.enabled ? '#2563eb' : '#94a3b8', marginRight: 6 }}></i>
+              <i className="fa-solid fa-cart-shopping" style={{ color: activity.enabled ? 'var(--accent-cyan)' : 'var(--muted2)', marginRight: 6 }}></i>
               Seed post-create activity
             </div>
             <div className="sub">Add ticket sales, bidder activity, and donation traffic after the event build finishes.</div>
