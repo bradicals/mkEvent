@@ -1,6 +1,6 @@
 // Sections - reusable section card plus QA-focused settings bodies.
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import MODEL from '../shared/event-model.js';
 
 export function Section({ icon, title, sub, summary, defaultOpen = false, children }) {
@@ -1341,9 +1341,22 @@ export function PostCreateActivityBody({ data, ticketPages, set }) {
   );
 }
 
-export function SettingsBody({ data, set, onTestConnection, testState, testError, onSaveProfile, onLoadProfile, onDeleteProfile }) {
+export function SettingsBody({ data, set, onTestConnection, testState, testError, onSaveProfile, onLoadProfile, onDeleteProfile, guide = false }) {
   const [showOrg, setShowOrg] = useState(false);
   const [showEvent, setShowEvent] = useState(false);
+  // First-run guided checklist: steps check off from live state; the current
+  // step's control gets a pulse highlight and is scrolled into view.
+  const guideSteps = guide ? [
+    { key: 'token', label: 'Paste your Organization API token', done: Boolean(data.orgToken) },
+    { key: 'creds', label: 'Enter your admin login credentials', done: Boolean(data.adminEmail && data.adminPassword) },
+    { key: 'test', label: 'Test the connection', done: testState === 'ok' },
+    { key: 'save', label: 'Save the profile for later', done: Boolean(data.selectedProfileId) },
+  ] : null;
+  const guideStep = guideSteps ? (guideSteps.find(s => !s.done)?.key || null) : null;
+  const guideRefs = useRef({});
+  useEffect(() => {
+    if (guideStep) guideRefs.current[guideStep]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [guideStep]);
   const currentBaseUrl = data.baseUrl || MODEL.ENVIRONMENTS[data.env]?.baseUrl || '';
   const currentApiBaseUrl = data.apiBaseUrl || MODEL.apiBaseUrlFrom(currentBaseUrl);
   const canTest = data.orgToken && data.organizationId;
@@ -1356,6 +1369,19 @@ export function SettingsBody({ data, set, onTestConnection, testState, testError
     });
   return (
     <div className="form-grid">
+      {guideSteps && (
+        <div className="field span-full">
+          <div className="setup-checklist" role="note" aria-label="First-time setup checklist">
+            <div className="coach-title"><i className="fa-solid fa-wand-magic-sparkles" /> Finish connecting mkEvent</div>
+            {guideSteps.map((s, i) => (
+              <div key={s.key} className={`setup-step ${s.done ? 'done' : ''} ${guideStep === s.key ? 'current' : ''}`}>
+                <span className="num">{s.done ? <i className="fa-solid fa-check" /> : i + 1}</span>
+                <span>{s.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="field span-2">
         <label>Environment base URL</label>
         <input type="text" value={currentBaseUrl} readOnly />
@@ -1401,8 +1427,8 @@ export function SettingsBody({ data, set, onTestConnection, testState, testError
           placeholder="Optional label like Main Stage Org"
         />
       </div>
-      <div className="field span-full" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <button className="btn btn-outline" disabled={!data.organizationId || !data.orgToken} onClick={onSaveProfile}>
+      <div className="field span-full" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }} ref={el => { guideRefs.current.save = el; }}>
+        <button className={`btn btn-outline ${guideStep === 'save' ? 'guide-pulse' : ''}`} disabled={!data.organizationId || !data.orgToken} onClick={onSaveProfile}>
           <i className="fa-regular fa-floppy-disk"></i>
           {data.selectedProfileId ? ' Save profile' : ' Save current org profile'}
         </button>
@@ -1411,8 +1437,9 @@ export function SettingsBody({ data, set, onTestConnection, testState, testError
           Delete selected profile
         </button>
       </div>
-      <div className="field">
+      <div className={`field ${guideStep === 'token' ? 'is-guided' : ''}`} ref={el => { guideRefs.current.token = el; }}>
         <label>Org bearer token <span className="req">*</span></label>
+        {guideStep === 'token' && <div className="coach-inline"><i className="fa-solid fa-arrow-down" /> Paste the token you copied from API Settings here</div>}
         <div style={{ position: 'relative' }}>
           <input type={showOrg ? 'text' : 'password'} value={data.orgToken} onChange={e => set({ orgToken: e.target.value })} placeholder="Organization-scoped token" />
           <button onClick={() => setShowOrg(s => !s)} style={{ position: 'absolute', right: 8, top: 6, background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b', padding: 6 }}>
@@ -1444,17 +1471,17 @@ export function SettingsBody({ data, set, onTestConnection, testState, testError
           <div><strong>Browser fallback</strong> — if hosted V4 event create is not exposed, mkEvent can log into the admin UI and create the event there before switching back to API seeding. Store admin credentials locally below if you want that fallback to run unattended.</div>
         </div>
       </div>
-      <div className="field">
+      <div className={`field ${guideStep === 'creds' ? 'is-guided' : ''}`} ref={el => { guideRefs.current.creds = el; }}>
         <label>Admin login email</label>
         <input type="email" value={data.adminEmail || ''} onChange={e => set({ adminEmail: e.target.value })} placeholder="Admin UI email for fallback" />
       </div>
-      <div className="field">
+      <div className={`field ${guideStep === 'creds' ? 'is-guided' : ''}`}>
         <label>Admin login password</label>
         <input type="password" value={data.adminPassword || ''} onChange={e => set({ adminPassword: e.target.value })} placeholder="Admin UI password for fallback" />
         <div className="help">Saved locally only. Exported recipes never include credentials.</div>
       </div>
-      <div className="field span-full" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button className="btn btn-outline" disabled={!canTest || testState === 'testing'} onClick={onTestConnection}>
+      <div className="field span-full" style={{ display: 'flex', alignItems: 'center', gap: 12 }} ref={el => { guideRefs.current.test = el; }}>
+        <button className={`btn btn-outline ${guideStep === 'test' ? 'guide-pulse' : ''}`} disabled={!canTest || testState === 'testing'} onClick={onTestConnection}>
           <i className={`fa-solid ${testState === 'testing' ? 'fa-spinner fa-spin' : 'fa-plug'}`}></i>
           {testState === 'testing' ? ' Testing…' : testState === 'ok' ? ' Connected' : testState === 'fail' ? ' Connection failed' : ' Test connection'}
         </button>

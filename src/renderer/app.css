@@ -436,6 +436,20 @@ code, kbd, pre { background: var(--chip-bg); border-color: var(--card-border); c
 .coach-actions { display: flex; gap: 8px; }
 @keyframes coachIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 
+/* In-drawer setup checklist + current-step highlights */
+.setup-checklist { border: 1px solid var(--accent-cyan); border-radius: 12px; padding: 12px 14px; background: color-mix(in srgb, var(--accent-cyan) 6%, var(--card-bg)); display: flex; flex-direction: column; gap: 8px; }
+.setup-checklist .coach-title { margin-bottom: 2px; }
+.setup-step { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+.setup-step .num { width: 22px; height: 22px; border-radius: 50%; background: var(--chip-bg); color: var(--muted); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+.setup-step.current { color: var(--heading); font-weight: 600; }
+.setup-step.current .num { background: var(--accent-cyan); color: var(--on-accent); }
+.setup-step.done { color: var(--muted2); text-decoration: line-through; }
+.setup-step.done .num { background: color-mix(in srgb, var(--accent-lime) 22%, transparent); color: var(--ok-fg); }
+.coach-inline { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--accent-cyan); }
+.field.is-guided input { border-color: var(--accent-cyan); animation: guidePulse 1.6s ease-in-out infinite; }
+.guide-pulse { border-color: var(--accent-cyan) !important; animation: guidePulse 1.6s ease-in-out infinite; }
+@keyframes guidePulse { 0%, 100% { box-shadow: 0 0 0 3px rgba(0,163,255,0.18); } 50% { box-shadow: 0 0 0 7px rgba(0,163,255,0.3); } }
+
 /* Settings drawer */
 .settings-backdrop {
   position: fixed;
@@ -542,7 +556,8 @@ code, kbd, pre { background: var(--chip-bg); border-color: var(--card-border); c
 }
 @media (prefers-reduced-motion: reduce) {
   .wiz-progress .bar, .switch, .switch::after,
-  .settings-aside, .run-overlay, .run-progress .bar, .coach-mark { animation: none !important; transition: none !important; }
+  .settings-aside, .run-overlay, .run-progress .bar, .coach-mark,
+  .field.is-guided input, .guide-pulse { animation: none !important; transition: none !important; }
 }
 
 /* Connect step */
