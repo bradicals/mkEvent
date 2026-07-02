@@ -682,7 +682,20 @@ function App() {
               </section>
 
               <section className="drawer-section">
-                <h3 className="drawer-h">Connection</h3>
+                <div className="drawer-h-row">
+                  <h3 className="drawer-h">Connection</h3>
+                  {guideDismissed && !(cfg.api.orgToken && cfg.api.selectedProfileId) && (
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => {
+                        setGuideDismissed(false);
+                        try { window.localStorage?.removeItem('mkEvent.onboarding.firstRunGuideDismissed'); } catch (_) { /* ignore */ }
+                      }}
+                    >
+                      <i className="fa-solid fa-wand-magic-sparkles" /> Show setup guide
+                    </button>
+                  )}
+                </div>
                 <SettingsBody data={cfg.api} set={set('api')} onTestConnection={testConnection} testState={testState} testError={testError} onSaveProfile={saveApiProfile} onLoadProfile={loadApiProfile} onDeleteProfile={deleteApiProfile} guide={!guideDismissed && !(cfg.api.orgToken && cfg.api.selectedProfileId)} />
               </section>
             </div>
