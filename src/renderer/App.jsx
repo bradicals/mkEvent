@@ -616,8 +616,9 @@ function App() {
           <span className="coach-arrow" />
           <div className="coach-title"><i className="fa-solid fa-wand-magic-sparkles" /> First-time setup</div>
           <ol>
-            <li>In ClickBid admin, raise your org&apos;s <strong>active events</strong> limit first — event creation fails once the org is at its cap.</li>
-            <li>Then create an <strong>Org API token</strong> and paste it in <strong>Settings</strong> (the gear above).</li>
+            <li>Raise your org&apos;s event cap first — creation fails once it&apos;s hit: <span className="coach-path">Organization page → Admin → Organization Settings → <strong>Max # of Active Events</strong></span></li>
+            <li>Create and copy an org token: <span className="coach-path">API Settings → Create Token → For: <strong>Organization</strong></span></li>
+            <li>Paste it in mkEvent&apos;s <strong>Settings</strong> (the gear above).</li>
           </ol>
           <div className="coach-actions">
             <button className="btn btn-primary btn-sm" onClick={() => setShowSettings(true)}>Open Settings</button>

@@ -432,6 +432,7 @@ code, kbd, pre { background: var(--chip-bg); border-color: var(--card-border); c
 .coach-title { display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--heading); margin-bottom: 8px; }
 .coach-title i { color: var(--accent-cyan); }
 .coach-mark ol { margin: 0 0 12px; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.coach-path { display: block; margin-top: 2px; font-size: 12px; color: var(--muted); }
 .coach-actions { display: flex; gap: 8px; }
 @keyframes coachIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 
