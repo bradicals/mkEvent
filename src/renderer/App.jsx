@@ -403,6 +403,15 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [quickStartId, setQuickStartId] = useState('');
   const closeSettings = () => setShowSettings(false);
+  // First-run guide: shown until an org token exists or the user dismisses it.
+  const [guideDismissed, setGuideDismissed] = useState(() => {
+    try { return window.localStorage?.getItem('mkEvent.onboarding.firstRunGuideDismissed') === '1'; }
+    catch (_) { return true; }
+  });
+  const dismissGuide = () => {
+    setGuideDismissed(true);
+    try { window.localStorage?.setItem('mkEvent.onboarding.firstRunGuideDismissed', '1'); } catch (_) { /* ignore */ }
+  };
   const [theme, setTheme] = useState(() => {
     let initial = 'light';
     try { initial = window.localStorage?.getItem('mkEvent.onboarding.theme') || 'light'; }
@@ -602,6 +611,20 @@ function App() {
   return (
     <>
       <AppTop cfg={cfg} onOpenSettings={() => setShowSettings(true)} />
+      {!guideDismissed && !cfg.api.orgToken && !showSettings && (
+        <div className="coach-mark" role="note" aria-label="First-time setup">
+          <span className="coach-arrow" />
+          <div className="coach-title"><i className="fa-solid fa-wand-magic-sparkles" /> First-time setup</div>
+          <ol>
+            <li>In ClickBid admin, raise your org&apos;s <strong>active events</strong> limit first — event creation fails once the org is at its cap.</li>
+            <li>Then create an <strong>Org API token</strong> and paste it in <strong>Settings</strong> (the gear above).</li>
+          </ol>
+          <div className="coach-actions">
+            <button className="btn btn-primary btn-sm" onClick={() => setShowSettings(true)}>Open Settings</button>
+            <button className="btn btn-ghost btn-sm" onClick={dismissGuide}>Dismiss</button>
+          </div>
+        </div>
+      )}
       <div className="wizard">
         <StepRail cfg={cfg} slugCheck={slugCheck} step={step} onJump={goto} />
         <StepCard step={currentStep}>

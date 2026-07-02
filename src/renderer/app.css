@@ -414,6 +414,27 @@ code, kbd, pre { background: var(--chip-bg); border-color: var(--card-border); c
   background: var(--input-bg);
 }
 
+/* First-run coach mark (points at the gear in the top bar) */
+.coach-mark {
+  position: fixed; top: 74px; right: 16px; z-index: 60;
+  width: 330px; padding: 14px 16px;
+  background: var(--card-bg); border: 1px solid var(--accent-cyan); border-radius: 14px;
+  box-shadow: var(--card-shadow);
+  font-size: 13px; color: var(--text); line-height: 1.5;
+  animation: coachIn 0.25s ease;
+}
+.coach-arrow {
+  position: absolute; top: -7px; right: 24px; width: 12px; height: 12px;
+  background: var(--card-bg);
+  border-left: 1px solid var(--accent-cyan); border-top: 1px solid var(--accent-cyan);
+  transform: rotate(45deg);
+}
+.coach-title { display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--heading); margin-bottom: 8px; }
+.coach-title i { color: var(--accent-cyan); }
+.coach-mark ol { margin: 0 0 12px; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.coach-actions { display: flex; gap: 8px; }
+@keyframes coachIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
 /* Settings drawer */
 .settings-backdrop {
   position: fixed;
@@ -520,7 +541,7 @@ code, kbd, pre { background: var(--chip-bg); border-color: var(--card-border); c
 }
 @media (prefers-reduced-motion: reduce) {
   .wiz-progress .bar, .switch, .switch::after,
-  .settings-aside, .run-overlay, .run-progress .bar { animation: none !important; transition: none !important; }
+  .settings-aside, .run-overlay, .run-progress .bar, .coach-mark { animation: none !important; transition: none !important; }
 }
 
 /* Connect step */
