@@ -14,6 +14,7 @@ import {
   TicketPagesBody,
 } from './sections.jsx';
 import { RunModal } from './create-runner.jsx';
+import STOCKED_RECIPE from './stocked-recipe.json';
 // Side-effect import: wizard.js sets globalThis.WIZARD for the browser bundle
 // (see wizard.js for why a plain `import * as WIZARD`/default import doesn't work here).
 import './wizard.js';
@@ -334,7 +335,9 @@ function ConnectStep({ cfg, set, switchEnv, onQuickStart, activeQuickStart, onTe
         </div>
         {activePreset && (
           <div className="quick-start-note">
-            <i className="fa-solid fa-circle-check" /> Applied <strong>{activePreset.name}</strong> — bidder and item counts are prefilled. Review or tweak them on the Bidders and Items steps.
+            <i className="fa-solid fa-circle-check" /> Applied <strong>{activePreset.name}</strong> — {activePreset.id === 'stocked'
+              ? 'bidders, items, auction settings, ticket pages, and post-create activity are prefilled. Review the steps to tweak.'
+              : 'bidder and item counts are prefilled. Review or tweak them on the Bidders and Items steps.'}
           </div>
         )}
       </div>
@@ -588,7 +591,11 @@ function App() {
   const renderStepBody = () => {
     switch (currentStep.id) {
       case 'connect':
-        return <ConnectStep cfg={cfg} set={set} switchEnv={switchEnv} onQuickStart={(preset) => { WIZARD.applyQuickStart(setCfg, preset); setQuickStartId(preset.id); }} activeQuickStart={quickStartId} onTest={testConnection} testState={testState} testError={testError} />;
+        return <ConnectStep cfg={cfg} set={set} switchEnv={switchEnv} onQuickStart={(preset) => {
+          if (preset.id === 'stocked') setCfg((current) => EVENT_MODEL.importRecipeConfig(current, STOCKED_RECIPE));
+          else WIZARD.applyQuickStart(setCfg, preset);
+          setQuickStartId(preset.id);
+        }} activeQuickStart={quickStartId} onTest={testConnection} testState={testState} testError={testError} />;
       case 'basics':
         return <BasicsBody data={cfg.basics} set={set('basics')} slugCheck={slugCheck} onCheckSlug={checkSlugAvailability} />;
       case 'bidders':

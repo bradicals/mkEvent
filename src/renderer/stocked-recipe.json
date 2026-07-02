@@ -1,0 +1,219 @@
+{
+  "version": 1,
+  "bidders": {
+    "activeTab": "bulk",
+    "bulk": {
+      "count": 75,
+      "startNum": 100,
+      "useFaker": true,
+      "firstNamePrefix": "QA",
+      "lastNamePrefix": "Bidder",
+      "emailPrefix": "qa-bidder",
+      "emailDomain": "example.com",
+      "acceptTexts": false,
+      "addPhones": false
+    },
+    "exact": {
+      "records": []
+    }
+  },
+  "items": {
+    "activeTab": "bulk",
+    "bulk": {
+      "silentCount": 20,
+      "liveCount": 20,
+      "donationCount": 20,
+      "quantityCount": 20,
+      "startNum": 1,
+      "useFaker": true,
+      "namePrefix": "QA Item",
+      "startingBid": 25,
+      "bidIncrement": 5,
+      "fairMarketValue": 100,
+      "reserveAmount": 0,
+      "statusId": 1,
+      "quantityItemQty": 100,
+      "quantityItemTiers": "1-25, 5-100, 10-180"
+    },
+    "exact": {
+      "records": []
+    }
+  },
+  "auctionSettings": {
+    "enabled": true,
+    "useExistingMerchantAccount": true,
+    "maxBidding": true,
+    "allowBidderRegistration": true,
+    "enableTextToRegister": false,
+    "resetMobileCheckin": true,
+    "requireAddress": false,
+    "requireCreditCard": false,
+    "syncStartingBidderNumber": true,
+    "startingBidderNumber": "100",
+    "enableCrypto": false,
+    "enableLink": false
+  },
+  "ticketPages": {
+    "enabled": true,
+    "preset": "full",
+    "useFaker": false,
+    "pages": [
+      {
+        "formName": "tix",
+        "displayName": "Tickets",
+        "settings": {
+          "creditCard": true,
+          "sendInvoice": true,
+          "cash": true,
+          "check": true,
+          "allowGuestUpdates": true,
+          "showQrCode": true
+        },
+        "individualTickets": [
+          {
+            "name": "General Admission",
+            "price": 100,
+            "fairMarketValue": 0,
+            "ticketsPerPurchase": 1,
+            "availability": 100,
+            "visible": true,
+            "customQuestions": [
+              {
+                "question": "Guest names",
+                "type": "text",
+                "showOn": "ticket",
+                "required": false,
+                "isActive": true,
+                "answers": []
+              },
+              {
+                "question": "Meal preference",
+                "type": "dropdown",
+                "showOn": "guest",
+                "required": false,
+                "isActive": true,
+                "answers": [
+                  "Chicken",
+                  "Vegetarian",
+                  "No meal needed"
+                ]
+              }
+            ]
+          }
+        ],
+        "sponsors": [
+          {
+            "title": "Gold Sponsor",
+            "price": 1000,
+            "fairMarketValue": 0,
+            "ticketsPerPurchase": 8,
+            "availability": 10,
+            "visible": true,
+            "customQuestions": [
+              {
+                "question": "Company logo contact",
+                "type": "text",
+                "showOn": "ticket",
+                "required": false,
+                "isActive": true,
+                "answers": []
+              },
+              {
+                "question": "Recognition preference",
+                "type": "dropdown",
+                "showOn": "ticket",
+                "required": false,
+                "isActive": true,
+                "answers": [
+                  "Website",
+                  "Program",
+                  "Both"
+                ]
+              }
+            ]
+          }
+        ],
+        "underwriting": [
+          {
+            "title": "Dessert Sponsor",
+            "price": 500,
+            "fairMarketValue": 0,
+            "availability": 5,
+            "visible": true,
+            "customQuestions": []
+          }
+        ],
+        "selections": [
+          {
+            "name": "Chicken",
+            "description": "",
+            "quantity": 100,
+            "visible": true,
+            "showOnType": "ticket-form",
+            "showOnIndex": 0,
+            "customQuestions": []
+          },
+          {
+            "name": "Vegetarian",
+            "description": "",
+            "quantity": 50,
+            "visible": true,
+            "showOnType": "ticket-form",
+            "showOnIndex": 0,
+            "customQuestions": []
+          }
+        ],
+        "quantityItemBulkIndexes": [
+          32,
+          33,
+          60,
+          61
+        ],
+        "quantityItemExactIndexes": [],
+        "donationItemBulkIndexes": [
+          40,
+          41
+        ],
+        "donationItemExactIndexes": [],
+        "pageCustomQuestions": []
+      }
+    ]
+  },
+  "postCreateActivity": {
+    "enabled": true,
+    "useFaker": true,
+    "ticketPurchases": {
+      "enabled": true,
+      "pageIndex": 0,
+      "targetMode": "mixed",
+      "targetType": "individual-ticket",
+      "targetIndex": 0,
+      "purchaseCount": 18,
+      "quantity": 1,
+      "donationPurchaseCount": 8,
+      "addDonation": true,
+      "donationAmount": 50,
+      "paymentMethod": "check",
+      "paymentMix": {
+        "check": 1,
+        "cash": 3,
+        "invoice": 6,
+        "credit_card": 8
+      }
+    },
+    "auctionActivity": {
+      "enabled": true,
+      "bidCount": 21,
+      "maxBidCount": 2,
+      "includeSilent": true,
+      "includeLive": true
+    },
+    "donationActivity": {
+      "enabled": true,
+      "donationCount": 3,
+      "amountMin": 25,
+      "amountMax": 250,
+      "anonymousRate": 25
+    }
+  }
+}

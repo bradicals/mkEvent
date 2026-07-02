@@ -45,12 +45,13 @@ const QUICK_START = [
     bidders: 75,  items: { silent: 40,  live: 12, donation: 6,  quantity: 0 } },
   { id: 'stress',  icon: 'fa-gauge-high',        name: 'Stress test',  blurb: '500 bidders · 270 items',
     bidders: 500, items: { silent: 180, live: 60, donation: 30, quantity: 0 } },
-  { id: 'minimal', icon: 'fa-feather',           name: 'Minimal',      blurb: '5 bidders · 7 items',
-    bidders: 5,   items: { silent: 5,   live: 2,  donation: 0,  quantity: 0 } },
+  // 'stocked' carries a full recipe (stocked-recipe.json) instead of counts;
+  // App.jsx applies it via EVENT_MODEL.importRecipeConfig, not applyQuickStart.
+  { id: 'stocked', icon: 'fa-boxes-stacked',     name: 'Stocked',      blurb: '75 bidders · 80 items · tickets + activity' },
 ];
 
 function applyQuickStart(setCfg, preset) {
-  if (!preset) return;
+  if (!preset || !preset.items) return;
   setCfg((current) => ({
     ...current,
     bidders: { ...current.bidders, bulk: { ...current.bidders.bulk, count: preset.bidders } },
