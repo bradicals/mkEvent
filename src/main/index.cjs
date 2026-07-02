@@ -52,7 +52,7 @@ function createWindow() {
         { role: 'copy', enabled: params.editFlags.canCopy },
         { role: 'paste', enabled: params.editFlags.canPaste },
         { type: 'separator' },
-        { role: 'selectAll' },
+        { role: 'selectAll', enabled: params.editFlags.canSelectAll },
       );
     }
     if (isDev) {
