@@ -318,6 +318,28 @@
     return [];
   }
 
+  // Bulk item POST has no per-item collision retry (unlike createOne), and
+  // browser-fallback-created events land with pre-seeded items, so the
+  // deterministic 1..N numbering collides (issue #5). Detection + renumber
+  // helpers for the orchestrator's retry.
+  function isItemNumberCollision(error) {
+    return String(error?.message || '').toLowerCase().includes('item_number has already been taken');
+  }
+
+  // Shift every bulk item_number by `offset`. bulkQuantityItems/bulkDonationItems
+  // are copies of the bulk records (not references), so they must shift too or
+  // ticket-page attachment-by-number stops resolving.
+  function shiftBulkItemNumbers(recipe, offset) {
+    const lists = [
+      recipe.items.bulk?.records || [],
+      recipe.items.bulkQuantityItems || [],
+      recipe.items.bulkDonationItems || [],
+    ];
+    for (const list of lists) {
+      for (const record of list) record.item_number = Number(record.item_number) + offset;
+    }
+  }
+
   function shouldUseBrowserFallback(error) {
     const message = String(error?.message || '').toLowerCase();
     return message.includes('unrecognized endpoint of organizations/') && message.includes('/events');
@@ -663,7 +685,22 @@
     const exactItemRecords = recipe.items.exact?.records || [];
     let createdItems = [];
     if (bulkItemRecords.length > 0) {
-      const bulkResp = await itemAdapter.createBulk(eventId, bulkItemRecords);
+      let bulkResp;
+      try {
+        bulkResp = await itemAdapter.createBulk(eventId, bulkItemRecords);
+      } catch (err) {
+        if (!isItemNumberCollision(err)) throw err;
+        // Pre-seeded items (browser-fallback-created events) occupy our
+        // numbers — renumber past the highest existing one and retry once.
+        const existing = extractResourceItems(await client.get(`/events/${eventId}/items?per_page=500`));
+        const maxExisting = existing.reduce((max, item) => Math.max(max, Number(item.item_number) || 0), 0);
+        const minPosted = bulkItemRecords.reduce((min, item) => Math.min(min, Number(item.item_number) || 1), Infinity);
+        const offset = maxExisting + 1 - minPosted;
+        if (offset <= 0) throw err; // collision isn't from pre-existing numbers — don't loop
+        progress.warn('items', `Item numbers collide with ${existing.length} pre-existing item(s) — renumbering bulk items to start at ${minPosted + offset} and retrying…`);
+        shiftBulkItemNumbers(recipe, offset);
+        bulkResp = await itemAdapter.createBulk(eventId, bulkItemRecords);
+      }
       createdItems = createdItems.concat(extractResourceItems(bulkResp));
     }
     const exactItemResults = [];

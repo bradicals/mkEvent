@@ -911,3 +911,81 @@ test('createEvent uses httpApplyPostItemConfig (HTTP path) and skips browser ada
   assert.equal(httpApplyCalled, true, 'HTTP post-item-config should have been called');
   assert.equal(browserAdapterCalled, false, 'browser adapter should not have been called');
 });
+
+test('createEvent renumbers bulk items past pre-existing items on collision and retries once', async () => {
+  const bulkPosts = [];
+  let itemsListFetches = 0;
+  model.apiProxyCall = (_a, targetUrl, method, _d, body) => {
+    const key = `${method} ${targetUrl}`;
+    if (key === 'POST https://cbodev2.com/api/v4/organizations/2716/events') {
+      return Promise.resolve({ status: 201, headers: {}, body: JSON.stringify({ id: 'evt-c' }) });
+    }
+    if (key === 'POST https://cbodev2.com/api/v4/events/evt-c/items/bulk') {
+      bulkPosts.push(body.items.map((i) => i.item_number));
+      if (bulkPosts.length === 1) {
+        // Fallback-created events land with pre-seeded items 1..8 (issue #5).
+        return Promise.resolve({ status: 422, headers: {}, body: JSON.stringify({ message: 'The items.0.item_number has already been taken. (and 2 more errors)' }) });
+      }
+      return Promise.resolve({ status: 201, headers: {}, body: JSON.stringify({ data: body.items.map((i, idx) => ({ id: `i${idx}`, item_number: i.item_number, item_type_id: i.item_type_id })) }) });
+    }
+    if (key === 'GET https://cbodev2.com/api/v4/events/evt-c/items?per_page=500') {
+      itemsListFetches += 1;
+      return Promise.resolve({ status: 200, headers: {}, body: JSON.stringify({ data: Array.from({ length: 8 }, (_v, i) => ({ id: `pre${i}`, item_number: i + 1 })) }) });
+    }
+    return Promise.resolve({ status: 500, headers: {}, body: JSON.stringify({ message: 'unmocked' }) });
+  };
+
+  const config = {
+    api: { env: 'dev2', organizationId: '2716', orgToken: 'tok', proxyUrl: 'http://localhost:9999/proxy' },
+    basics: { ...model.DEFAULT_CONFIG.basics, name: 'Collide', slug: 'qacollide', startDate: '2026-06-01', endDate: '2026-06-02', onCallDate: '2026-06-02' },
+    bidders: { activeTab: 'bulk', bulk: { ...model.DEFAULT_CONFIG.bidders.bulk, count: 0 }, exact: { records: [] } },
+    items: { activeTab: 'bulk', bulk: { ...model.DEFAULT_CONFIG.items.bulk, silentCount: 1, liveCount: 0, donationCount: 1, quantityCount: 1, startNum: 1 }, exact: { records: [] } },
+  };
+  const recipe = model.buildRecipe(config);
+
+  const { callbacks, logs } = capturingProgress();
+  const result = await engine.createEvent(config, recipe, callbacks);
+
+  assert.equal(result.eventId, 'evt-c');
+  assert.equal(itemsListFetches, 1, 'should fetch existing items exactly once');
+  assert.deepEqual(bulkPosts[0], [1, 2, 3], 'first attempt posts the original numbers');
+  assert.deepEqual(bulkPosts[1], [9, 10, 11], 'retry renumbers past the 8 pre-existing items');
+  // The quantity/donation copies must shift with the records so
+  // attachment-by-number still resolves against the created items.
+  assert.equal(recipe.items.bulkDonationItems[0].item_number, 10);
+  assert.equal(recipe.items.bulkQuantityItems[0].item_number, 11);
+  assert.ok(logs.some((l) => l.kind === 'warn' && l.msg.includes('renumbering bulk items to start at 9')), 'should warn about the renumber');
+});
+
+test('createEvent rethrows bulk item collision when existing numbers are not the cause', async () => {
+  let bulkPostCount = 0;
+  model.apiProxyCall = (_a, targetUrl, method) => {
+    const key = `${method} ${targetUrl}`;
+    if (key === 'POST https://cbodev2.com/api/v4/organizations/2716/events') {
+      return Promise.resolve({ status: 201, headers: {}, body: JSON.stringify({ id: 'evt-c2' }) });
+    }
+    if (key === 'POST https://cbodev2.com/api/v4/events/evt-c2/items/bulk') {
+      bulkPostCount += 1;
+      return Promise.resolve({ status: 422, headers: {}, body: JSON.stringify({ message: 'The items.0.item_number has already been taken.' }) });
+    }
+    if (key === 'GET https://cbodev2.com/api/v4/events/evt-c2/items?per_page=500') {
+      // Event has no items — collision is not from pre-existing numbers.
+      return Promise.resolve({ status: 200, headers: {}, body: JSON.stringify({ data: [] }) });
+    }
+    return Promise.resolve({ status: 500, headers: {}, body: JSON.stringify({ message: 'unmocked' }) });
+  };
+
+  const config = {
+    api: { env: 'dev2', organizationId: '2716', orgToken: 'tok', proxyUrl: 'http://localhost:9999/proxy' },
+    basics: { ...model.DEFAULT_CONFIG.basics, name: 'Collide2', slug: 'qacollide2', startDate: '2026-06-01', endDate: '2026-06-02', onCallDate: '2026-06-02' },
+    bidders: { activeTab: 'bulk', bulk: { ...model.DEFAULT_CONFIG.bidders.bulk, count: 0 }, exact: { records: [] } },
+    items: { activeTab: 'bulk', bulk: { ...model.DEFAULT_CONFIG.items.bulk, silentCount: 2, liveCount: 0, donationCount: 0, quantityCount: 0, startNum: 1 }, exact: { records: [] } },
+  };
+  const recipe = model.buildRecipe(config);
+
+  await assert.rejects(
+    () => engine.createEvent(config, recipe, noopProgress()),
+    /item_number has already been taken/,
+  );
+  assert.equal(bulkPostCount, 1, 'should not retry when renumbering cannot help');
+});
