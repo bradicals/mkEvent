@@ -3,6 +3,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import MODEL from '../shared/event-model.js';
 
+// Checked once at load — sendSync IPC, so don't call it per render.
+const SECURE_STORAGE_ON = Boolean(window.mkEventDesktop?.secureSettings?.isAvailable?.());
+
 export function Section({ icon, title, sub, summary, defaultOpen = false, children }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
@@ -1401,10 +1404,17 @@ export function SettingsBody({ data, set, onTestConnection, testState, testError
         <div className="help">Fixed to localhost:9999. The proxy accepts API calls from the browser and forwards them to allowed ClickBid hosts only.</div>
       </div>
       <div className="field span-full">
-        <div className="callout warn">
-          <i className="fa-solid fa-triangle-exclamation"></i>
-          <div><strong>Prototype security note</strong> — Bearer tokens below are stored in browser localStorage. This is acceptable for a local development prototype but not for shared or internet-facing use. The planned desktop app will use the OS keychain instead.</div>
-        </div>
+        {SECURE_STORAGE_ON ? (
+          <div className="callout">
+            <i className="fa-solid fa-lock"></i>
+            <div><strong>Token storage</strong> — Tokens and credentials are encrypted with your OS user account (Electron safeStorage) and stored locally on this machine only.</div>
+          </div>
+        ) : (
+          <div className="callout warn">
+            <i className="fa-solid fa-triangle-exclamation"></i>
+            <div><strong>Security note</strong> — OS-level encryption is unavailable here, so tokens are stored in plaintext localStorage. Use the desktop app for encrypted storage.</div>
+          </div>
+        )}
       </div>
       <div className="field span-2">
         <label>Saved org profile</label>
