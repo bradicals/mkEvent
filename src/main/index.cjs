@@ -25,11 +25,13 @@ ipcMain.on('secure-settings:load', (event) => {
   }
 });
 
-ipcMain.on('secure-settings:save', (_event, json) => {
+ipcMain.on('secure-settings:save', (event, json) => {
   try {
     fs.writeFileSync(secureSettingsFile(), safeStorage.encryptString(String(json)));
+    event.returnValue = true;
   } catch (err) {
     console.warn('secure-settings save failed:', err.message);
+    event.returnValue = false;
   }
 });
 

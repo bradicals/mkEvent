@@ -64,9 +64,8 @@ function loadInitialConfig() {
       saved = readPlaintextSettings(defaults.api.env);
       if (saved && SECURE_ON) {
         // One-time migration: move plaintext settings into the encrypted
-        // store, then delete every plaintext copy.
-        SECURE.save(saved);
-        purgePlaintextSettings();
+        // store; only delete the plaintext copies once the save is confirmed.
+        if (SECURE.save(saved) === true) purgePlaintextSettings();
       }
     }
     return saved ? EVENT_MODEL.importLocalSettings(defaults, JSON.parse(saved)) : defaults;

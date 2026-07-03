@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('mkEventDesktop', {
   secureSettings: {
     isAvailable: () => ipcRenderer.sendSync('secure-settings:available'),
     load: () => ipcRenderer.sendSync('secure-settings:load'),
-    save: (json) => ipcRenderer.send('secure-settings:save', json),
+    // Sync so callers get a success ack — migration must not purge the
+    // plaintext copy unless the encrypted write actually landed.
+    save: (json) => ipcRenderer.sendSync('secure-settings:save', json),
   },
 });
