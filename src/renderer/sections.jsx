@@ -1,6 +1,6 @@
 // Sections - reusable section card plus QA-focused settings bodies.
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import MODEL from '../shared/event-model.js';
 
 export function Section({ icon, title, sub, summary, defaultOpen = false, children }) {
@@ -572,10 +572,10 @@ export function AuctionSettingsBody({ data, bidders, set }) {
   return (
     <div className="section-pane-stack">
       <div className="field span-full">
-        <div className="toggle-row" style={{ padding: '10px 14px', borderRadius: 8, background: settings.enabled ? '#eff6ff' : 'transparent', border: settings.enabled ? '1px solid #bfdbfe' : '1px solid transparent' }}>
+        <div className={`toggle-row master ${settings.enabled ? 'is-enabled' : ''}`}>
           <div>
             <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>
-              <i className="fa-solid fa-sliders" style={{ color: settings.enabled ? '#2563eb' : '#94a3b8', marginRight: 6 }}></i>
+              <i className="fa-solid fa-sliders" style={{ color: settings.enabled ? 'var(--accent-cyan)' : 'var(--muted2)', marginRight: 6 }}></i>
               Apply post-create auction settings
             </div>
             <div className="sub">Uses the logged-in admin browser fallback session after the event is created. Turn this off to leave ClickBid defaults unchanged.</div>
@@ -921,10 +921,10 @@ export function TicketPagesBody({ data, items, set, basics = {}, api = {} }) {
   return (
     <div className="section-pane-stack">
       <div className="field span-full">
-        <div className="toggle-row" style={{ padding: '10px 14px', borderRadius: 8, background: ticketPages.enabled ? '#eff6ff' : 'transparent', border: ticketPages.enabled ? '1px solid #bfdbfe' : '1px solid transparent' }}>
+        <div className={`toggle-row master ${ticketPages.enabled ? 'is-enabled' : ''}`}>
           <div>
             <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>
-              <i className="fa-solid fa-ticket" style={{ color: ticketPages.enabled ? '#2563eb' : '#94a3b8', marginRight: 6 }}></i>
+              <i className="fa-solid fa-ticket" style={{ color: ticketPages.enabled ? 'var(--accent-cyan)' : 'var(--muted2)', marginRight: 6 }}></i>
               Configure ticket pages after event creation
             </div>
             <div className="sub">Quick event setup only. Runtime application will use the admin/browser fallback session in the next phase.</div>
@@ -1147,10 +1147,10 @@ export function PostCreateActivityBody({ data, ticketPages, set }) {
   return (
     <div className="section-pane-stack">
       <div className="field span-full">
-        <div className="toggle-row" style={{ padding: '10px 14px', borderRadius: 8, background: activity.enabled ? '#eff6ff' : 'transparent', border: activity.enabled ? '1px solid #bfdbfe' : '1px solid transparent' }}>
+        <div className={`toggle-row master ${activity.enabled ? 'is-enabled' : ''}`}>
           <div>
             <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>
-              <i className="fa-solid fa-cart-shopping" style={{ color: activity.enabled ? '#2563eb' : '#94a3b8', marginRight: 6 }}></i>
+              <i className="fa-solid fa-cart-shopping" style={{ color: activity.enabled ? 'var(--accent-cyan)' : 'var(--muted2)', marginRight: 6 }}></i>
               Seed post-create activity
             </div>
             <div className="sub">Add ticket sales, bidder activity, and donation traffic after the event build finishes.</div>
@@ -1341,9 +1341,25 @@ export function PostCreateActivityBody({ data, ticketPages, set }) {
   );
 }
 
-export function SettingsBody({ data, set, onTestConnection, testState, testError, onSaveProfile, onLoadProfile, onDeleteProfile }) {
+export function SettingsBody({ data, set, onTestConnection, testState, testError, onSaveProfile, onLoadProfile, onDeleteProfile, guide = false }) {
   const [showOrg, setShowOrg] = useState(false);
   const [showEvent, setShowEvent] = useState(false);
+  // First-run guided checklist: steps check off from live state; the current
+  // step's control gets a pulse highlight and is scrolled into view.
+  const guideSteps = guide ? [
+    { key: 'org', label: 'Enter your Organization ID', done: Boolean(data.organizationId) },
+    { key: 'token', label: 'Paste your Organization API token', done: Boolean(data.orgToken) },
+    // Optional: also checks off once the user moves on (test/save) so empty
+    // fallback credentials never strand the highlight.
+    { key: 'creds', label: 'Enter your admin login credentials (optional)', done: Boolean((data.adminEmail && data.adminPassword) || testState === 'ok' || data.selectedProfileId) },
+    { key: 'test', label: 'Test the connection', done: testState === 'ok' },
+    { key: 'save', label: 'Save the profile for later', done: Boolean(data.selectedProfileId) },
+  ] : null;
+  const guideStep = guideSteps ? (guideSteps.find(s => !s.done)?.key || null) : null;
+  const guideRefs = useRef({});
+  useEffect(() => {
+    if (guideStep) guideRefs.current[guideStep]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [guideStep]);
   const currentBaseUrl = data.baseUrl || MODEL.ENVIRONMENTS[data.env]?.baseUrl || '';
   const currentApiBaseUrl = data.apiBaseUrl || MODEL.apiBaseUrlFrom(currentBaseUrl);
   const canTest = data.orgToken && data.organizationId;
@@ -1356,6 +1372,19 @@ export function SettingsBody({ data, set, onTestConnection, testState, testError
     });
   return (
     <div className="form-grid">
+      {guideSteps && (
+        <div className="field span-full">
+          <div className="setup-checklist" role="note" aria-label="First-time setup checklist">
+            <div className="coach-title"><i className="fa-solid fa-wand-magic-sparkles" /> Finish connecting mkEvent</div>
+            {guideSteps.map((s, i) => (
+              <div key={s.key} className={`setup-step ${s.done ? 'done' : ''} ${guideStep === s.key ? 'current' : ''}`}>
+                <span className="num">{s.done ? <i className="fa-solid fa-check" /> : i + 1}</span>
+                <span>{s.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="field span-2">
         <label>Environment base URL</label>
         <input type="text" value={currentBaseUrl} readOnly />
@@ -1401,18 +1430,14 @@ export function SettingsBody({ data, set, onTestConnection, testState, testError
           placeholder="Optional label like Main Stage Org"
         />
       </div>
-      <div className="field span-full" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <button className="btn btn-outline" disabled={!data.organizationId || !data.orgToken} onClick={onSaveProfile}>
-          <i className="fa-regular fa-floppy-disk"></i>
-          {data.selectedProfileId ? ' Save profile' : ' Save current org profile'}
-        </button>
-        <button className="btn btn-outline" disabled={!data.selectedProfileId} onClick={() => onDeleteProfile?.(data.selectedProfileId)}>
-          <i className="fa-regular fa-trash-can"></i>
-          Delete selected profile
-        </button>
+      <div className={`field ${guideStep === 'org' ? 'is-guided' : ''}`} ref={el => { guideRefs.current.org = el; }}>
+        <label>Organization ID <span className="req">*</span></label>
+        <input type="text" value={data.organizationId} onChange={e => set({ organizationId: e.target.value })} placeholder="Org ID or organization slug" />
+        <div className="help">Same value as the Connect step — needed before the connection test.</div>
       </div>
-      <div className="field">
+      <div className={`field ${guideStep === 'token' ? 'is-guided' : ''}`} ref={el => { guideRefs.current.token = el; }}>
         <label>Org bearer token <span className="req">*</span></label>
+        {guideStep === 'token' && <div className="coach-inline"><i className="fa-solid fa-arrow-down" /> Paste the token you copied from API Settings here</div>}
         <div style={{ position: 'relative' }}>
           <input type={showOrg ? 'text' : 'password'} value={data.orgToken} onChange={e => set({ orgToken: e.target.value })} placeholder="Organization-scoped token" />
           <button onClick={() => setShowOrg(s => !s)} style={{ position: 'absolute', right: 8, top: 6, background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b', padding: 6 }}>
@@ -1444,22 +1469,32 @@ export function SettingsBody({ data, set, onTestConnection, testState, testError
           <div><strong>Browser fallback</strong> — if hosted V4 event create is not exposed, mkEvent can log into the admin UI and create the event there before switching back to API seeding. Store admin credentials locally below if you want that fallback to run unattended.</div>
         </div>
       </div>
-      <div className="field">
+      <div className={`field ${guideStep === 'creds' ? 'is-guided' : ''}`} ref={el => { guideRefs.current.creds = el; }}>
         <label>Admin login email</label>
         <input type="email" value={data.adminEmail || ''} onChange={e => set({ adminEmail: e.target.value })} placeholder="Admin UI email for fallback" />
       </div>
-      <div className="field">
+      <div className={`field ${guideStep === 'creds' ? 'is-guided' : ''}`}>
         <label>Admin login password</label>
         <input type="password" value={data.adminPassword || ''} onChange={e => set({ adminPassword: e.target.value })} placeholder="Admin UI password for fallback" />
         <div className="help">Saved locally only. Exported recipes never include credentials.</div>
       </div>
-      <div className="field span-full" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button className="btn btn-outline" disabled={!canTest || testState === 'testing'} onClick={onTestConnection}>
+      <div className="field span-full" style={{ display: 'flex', alignItems: 'center', gap: 12 }} ref={el => { guideRefs.current.test = el; }}>
+        <button className={`btn btn-outline ${guideStep === 'test' ? 'guide-pulse' : ''}`} disabled={!canTest || testState === 'testing'} onClick={onTestConnection}>
           <i className={`fa-solid ${testState === 'testing' ? 'fa-spinner fa-spin' : 'fa-plug'}`}></i>
           {testState === 'testing' ? ' Testing…' : testState === 'ok' ? ' Connected' : testState === 'fail' ? ' Connection failed' : ' Test connection'}
         </button>
         {testState === 'ok' && <span style={{ color: '#166534', fontWeight: 600 }}>✓ Connected to {data.env} / org {data.organizationId}</span>}
         {testState === 'fail' && testError && <span style={{ color: '#b91c1c' }}>{testError}</span>}
+      </div>
+      <div className="field span-full" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }} ref={el => { guideRefs.current.save = el; }}>
+        <button className={`btn btn-outline ${guideStep === 'save' ? 'guide-pulse' : ''}`} disabled={!data.organizationId || !data.orgToken} onClick={onSaveProfile}>
+          <i className="fa-regular fa-floppy-disk"></i>
+          {data.selectedProfileId ? ' Save profile' : ' Save current org profile'}
+        </button>
+        <button className="btn btn-outline" disabled={!data.selectedProfileId} onClick={() => onDeleteProfile?.(data.selectedProfileId)}>
+          <i className="fa-regular fa-trash-can"></i>
+          Delete selected profile
+        </button>
       </div>
       <div className="field span-full">
         <div className="callout">

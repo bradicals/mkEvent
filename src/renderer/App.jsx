@@ -10,11 +10,15 @@ import {
   EnvironmentBody,
   ItemsBody,
   PostCreateActivityBody,
-  Section,
   SettingsBody,
   TicketPagesBody,
 } from './sections.jsx';
 import { RunModal } from './create-runner.jsx';
+import STOCKED_RECIPE from './stocked-recipe.json';
+// Side-effect import: wizard.js sets globalThis.WIZARD for the browser bundle
+// (see wizard.js for why a plain `import * as WIZARD`/default import doesn't work here).
+import './wizard.js';
+const WIZARD = globalThis.WIZARD;
 
 function cloneDefaultConfig() {
   return JSON.parse(JSON.stringify(EVENT_MODEL.DEFAULT_CONFIG));
@@ -243,123 +247,148 @@ function PresetNameModal({ initialName, onSave, onCancel }) {
   );
 }
 
-function ConfigToolbar({ presets, selectedPresetId, onSelectPreset, onSavePreset, onDeletePreset, onImportRecipe, onExportRecipe }) {
+function StepRail({ cfg, slugCheck, step, onJump }) {
+  const ready = WIZARD.readyCount(cfg, slugCheck);
+  const pct = (step / (WIZARD.STEPS.length - 1)) * 100;
   return (
-    <div className="page-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 16 }}>
-      <PresetPicker presets={presets} selectedPresetId={selectedPresetId} onSelectPreset={onSelectPreset} />
-      <button className="btn btn-outline" onClick={onSavePreset}><i className="fa-regular fa-bookmark"></i> Save preset</button>
-      <button className="btn btn-outline" disabled={!selectedPresetId} onClick={onDeletePreset}><i className="fa-regular fa-trash-can"></i> Delete preset</button>
-      <button className="btn btn-outline" onClick={onImportRecipe}><i className="fa-solid fa-file-import"></i> Import recipe</button>
-      <button className="btn btn-outline" onClick={onExportRecipe}><i className="fa-regular fa-floppy-disk"></i> Export recipe</button>
-    </div>
-  );
-}
-
-function AppFoot({ cfg, summary, slugCheck, onCreate }) {
-  const basicsReady = Boolean(
-    cfg.basics.name &&
-    cfg.basics.slug &&
-    cfg.basics.startDate &&
-    cfg.basics.endDate &&
-    cfg.basics.onCallDate &&
-    cfg.basics.contactFirstName &&
-    cfg.basics.contactLastName &&
-    cfg.basics.contactEmail &&
-    cfg.basics.contactPhone
-  );
-  const slugBlocked = slugCheck?.slug === cfg.basics.slug && ['taken', 'invalid'].includes(slugCheck?.state);
-  const canCreate = Boolean(cfg.api.organizationId && cfg.api.orgToken && basicsReady && !slugBlocked);
-  return (
-    <div className="app-foot">
-      <div className="summary">
-        <span><strong>{summary.eventName}</strong></span>
-        <span className="dot-sep">·</span>
-        <span><strong>{summary.environment}</strong></span>
-        <span className="dot-sep">·</span>
-        <span><strong>{summary.bidderCount}</strong> bidders</span>
-        <span className="dot-sep">·</span>
-        <span><strong>{summary.itemCount}</strong> items ({summary.itemBreakdown.silent}S · {summary.itemBreakdown.live}L · {summary.itemBreakdown.donation}D · {summary.itemBreakdown.quantity}Q)</span>
-        <span className="dot-sep">·</span>
-        <span><strong>{summary.ticketPages.enabled ? summary.ticketPages.pageCount : 0}</strong> ticket pages</span>
-        {summary.publicUrl && (
-          <>
-            <span className="dot-sep">·</span>
-            <span className="summary-url" title={summary.publicUrl}>{summary.publicUrl.replace(/^https?:\/\//, '')}</span>
-          </>
-        )}
+    <aside className="wiz-rail">
+      <div className="wiz-rail-head">
+        <div className="wiz-eyebrow">Progress</div>
+        <div className="wiz-progress"><div className="bar" style={{ width: `${pct}%` }} /></div>
+        <div className="wiz-progress-label">{ready} of {WIZARD.STEPS.length} steps ready</div>
       </div>
-      <div className="grow"></div>
-      <button className="btn btn-lime btn-lg" disabled={!canCreate} onClick={onCreate} title={!canCreate ? (slugBlocked ? 'Choose an available event keyword before creating the event.' : 'Enter event basics, contact info, organization ID, and org token first.') : 'Create event'}>
-        <i className="fa-solid fa-rocket-launch"></i> Create event
-      </button>
+      <nav className="wiz-rail-items">
+        {WIZARD.STEPS.map((s, i) => {
+          const active = i === step;
+          const complete = !active && WIZARD.stepReady(cfg, s.id, slugCheck);
+          return (
+            <button
+              key={s.id}
+              type="button"
+              className={`wiz-rail-item ${active ? 'is-active' : ''} ${complete ? 'is-complete' : ''}`}
+              onClick={() => onJump(i)}
+            >
+              <span className="circle">{complete ? <i className="fa-solid fa-check" /> : s.num}</span>
+              <span className="label">{s.title}</span>
+            </button>
+          );
+        })}
+      </nav>
+    </aside>
+  );
+}
+
+function StepCard({ step, children }) {
+  return (
+    <div className="wiz-main">
+      <div className="wiz-head">
+        <div className="wiz-step-eyebrow">Step {step.num} of {WIZARD.STEPS.length}</div>
+        <h1 className="wiz-title">{step.title}</h1>
+        <p className="wiz-sub">{step.subtitle}</p>
+      </div>
+      <div className="wiz-card">{children}</div>
     </div>
   );
 }
 
-function envSummary(api) {
-  const safe = Object.hasOwn(EVENT_MODEL.ENVIRONMENTS, api.env);
-  return <><span className="pill" style={{background: safe ? '#dcfce7' : '#fef3c7', color: safe ? '#166534' : '#92400e'}}>● {api.env}</span><span className="pill">{api.organizationId || 'org required'}</span></>;
+function WizardFooter({ step, canCreate, onBack, onNext, onSkip, onCreate }) {
+  const isFirst = step === 0;
+  const isReview = step === WIZARD.STEPS.length - 1;
+  return (
+    <div className="wiz-foot">
+      <button className="btn btn-outline" disabled={isFirst} onClick={onBack}>
+        <i className="fa-solid fa-arrow-left" /> Back
+      </button>
+      <div className="grow" />
+      {!isReview && <button className="btn btn-ghost" onClick={onSkip}>Skip to review</button>}
+      {isReview ? (
+        <button className="btn btn-lime btn-lg" disabled={!canCreate} onClick={onCreate}
+          title={canCreate ? 'Create event' : 'Complete Connect and Event basics first.'}>
+          <i className="fa-solid fa-rocket" /> Create event
+        </button>
+      ) : (
+        <button className="btn btn-primary" onClick={onNext}>Continue <i className="fa-solid fa-arrow-right" /></button>
+      )}
+    </div>
+  );
 }
-function basicsSummary(b) {
-  return <>
-    <span className="pill">{b.slug || 'keyword required'}</span>
-    {b.startDate && <span className="pill">{new Date(`${b.startDate}T${b.startTime || '00:00'}`).toLocaleDateString([], {month:'short', day:'numeric', year:'numeric'})}</span>}
-    {b.contactFirstName && <span className="pill">{b.contactFirstName} {b.contactLastName || ''}</span>}
-  </>;
-}
-function biddersSummary(b) {
-  const bulk = b.bulk || b;
-  const exactCount = Array.isArray(b.exact?.records) ? b.exact.records.length : 0;
-  return <><span className="pill brand">{(bulk.count || 0) + exactCount} bidders</span><span className="pill">{bulk.count || 0} bulk + {exactCount} exact</span></>;
-}
-function itemsSummary(i) {
-  const bulk = i.bulk || i;
-  const exactCount = Array.isArray(i.exact?.records) ? i.exact.records.length : 0;
-  const bulkCount = (bulk.silentCount || 0) + (bulk.liveCount || 0) + (bulk.donationCount || 0) + (bulk.quantityCount || 0);
-  return <><span className="pill brand">{bulkCount + exactCount} items</span><span className="pill">{bulkCount} bulk + {exactCount} exact</span></>;
-}
-function auctionSettingsSummary(settings) {
-  const s = { ...EVENT_MODEL.DEFAULT_CONFIG.auctionSettings, ...(settings || {}) };
-  if (!s.enabled) return <><span className="pill">unchanged</span></>;
-  return <>
-    <span className="pill brand">post-create</span>
-    {s.useExistingMerchantAccount && <span className="pill">merchant</span>}
-    <span className="pill">max bidding {s.maxBidding ? 'yes' : 'no'}</span>
-    {s.requireCreditCard && <span className="pill">require CC</span>}
-  </>;
-}
-function ticketPagesSummary(ticketPages) {
-  const t = EVENT_MODEL.normalizeTicketPages(ticketPages);
-  if (!t.enabled) return <><span className="pill">off</span></>;
-  const totals = t.pages.reduce((sum, page) => {
-    const individualQuestions = page.individualTickets.reduce((count, ticket) => count + (ticket.customQuestions?.length || 0), 0);
-    const sponsorQuestions = page.sponsors.reduce((count, sponsor) => count + (sponsor.customQuestions?.length || 0), 0);
-    return {
-      tickets: sum.tickets + page.individualTickets.length,
-      sponsors: sum.sponsors + page.sponsors.length,
-      underwriting: sum.underwriting + page.underwriting.length,
-      selections: sum.selections + page.selections.length,
-      questions: sum.questions + individualQuestions + sponsorQuestions + (page.pageCustomQuestions?.length || 0),
-    };
-  }, { tickets: 0, sponsors: 0, underwriting: 0, selections: 0, questions: 0 });
-  return <>
-    <span className="pill brand">{t.preset}</span>
-    <span className="pill">{totals.tickets} tickets</span>
-    <span className="pill">{totals.sponsors} sponsors</span>
-    {(totals.underwriting + totals.selections + totals.questions) > 0 && <span className="pill">+{totals.underwriting + totals.selections + totals.questions} extras</span>}
-  </>;
-}
-function postCreateActivitySummary(postCreateActivity, ticketPages) {
-  const activity = EVENT_MODEL.normalizePostCreateActivity(postCreateActivity, ticketPages);
-  if (!activity.enabled) return <><span className="pill">off</span></>;
-  return <>
-    <span className="pill brand">{activity.ticketPurchases.purchaseCount} purchases</span>
-    <span className="pill">{activity.ticketPurchases.targetType === 'sponsor-ticket' ? 'sponsor' : 'ticket'} flow</span>
-    {activity.ticketPurchases.addDonation && <span className="pill">+ donation</span>}
-  </>;
-}
+
 function cloneData(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function ConnectStep({ cfg, set, switchEnv, onQuickStart, activeQuickStart, onTest, testState, testError }) {
+  const testLabel = { idle: 'Test connection', testing: 'Testing…', ok: 'Connected', fail: 'Failed' }[testState] || 'Test connection';
+  const canTest = Boolean(cfg.api.organizationId && cfg.api.orgToken) && testState !== 'testing';
+  const activePreset = WIZARD.QUICK_START.find((p) => p.id === activeQuickStart);
+  return (
+    <>
+      <div className="quick-start">
+        <div className="quick-start-eyebrow">Quick start — prefill a recipe</div>
+        <div className="quick-start-chips">
+          {WIZARD.QUICK_START.map((p) => (
+            <button key={p.id} type="button" className={`quick-chip ${activeQuickStart === p.id ? 'is-active' : ''}`} onClick={() => onQuickStart(p)}>
+              <span className="qc-icon"><i className={`fa-solid ${p.icon}`} /></span>
+              <span className="qc-text"><strong>{p.name}</strong><small>{p.blurb}</small></span>
+            </button>
+          ))}
+        </div>
+        {activePreset && (
+          <div className="quick-start-note">
+            <i className="fa-solid fa-circle-check" /> Applied <strong>{activePreset.name}</strong> — {activePreset.id === 'stocked'
+              ? 'bidders, items, auction settings, ticket pages, and post-create activity are prefilled. Review the steps to tweak.'
+              : 'bidder and item counts are prefilled. Review or tweak them on the Bidders and Items steps.'}
+          </div>
+        )}
+      </div>
+      <EnvironmentBody data={cfg.api} set={set('api')} onSwitchEnv={switchEnv} />
+      <div className="test-panel">
+        <span className={`test-dot ${testState}`} />
+        <div className="test-text">
+          <strong>Connection</strong>
+          <small>{testState === 'ok' ? 'API responded successfully.' : testState === 'fail' ? (testError || 'Could not reach the API.') : 'Verify the org token before creating an event.'}</small>
+        </div>
+        <button className="btn btn-outline" disabled={!canTest} onClick={onTest}>
+          {testState === 'testing' ? <i className="fa-solid fa-spinner fa-spin" /> : <i className="fa-solid fa-plug-circle-check" />} {testLabel}
+        </button>
+      </div>
+    </>
+  );
+}
+
+function ReviewStep({ summary, cfg }) {
+  const rows = [
+    ['fa-server', 'Environment', cfg.api.env],
+    ['fa-signature', 'Event', summary.eventName || 'Untitled event'],
+    ['fa-link', 'Keyword', `cbo.io/${cfg.basics.slug || '—'}`],
+    ['fa-calendar', 'Schedule', cfg.basics.startDate ? `${cfg.basics.startDate} ${cfg.basics.startTime || ''}`.trim() : 'Dates not set'],
+    ['fa-users', 'Bidders', `${summary.bidderCount}`],
+    ['fa-gavel', 'Items', `${summary.itemCount} (${summary.itemBreakdown.silent}S · ${summary.itemBreakdown.live}L · ${summary.itemBreakdown.donation}D · ${summary.itemBreakdown.quantity}Q)`],
+    ['fa-ticket', 'Ticket pages', summary.ticketPages.enabled ? `${summary.ticketPages.pageCount} pages` : 'Off'],
+    ['fa-address-card', 'Contact', `${cfg.basics.contactFirstName || ''} ${cfg.basics.contactLastName || ''}`.trim() || '—'],
+  ];
+  const envSafe = Object.hasOwn(EVENT_MODEL.ENVIRONMENTS, cfg.api.env);
+  return (
+    <div className="review">
+      <div className="review-hero">
+        <div className="review-hero-mark"><i className="fa-solid fa-rocket" /></div>
+        <div className="review-hero-text">
+          <strong>{summary.eventName || 'Untitled event'}</strong>
+          <span>cbo.io/{cfg.basics.slug || '—'}</span>
+        </div>
+        <span className={`review-env ${envSafe ? 'ok' : 'warn'}`}>{cfg.api.env}</span>
+      </div>
+      <div className="review-rows">
+        {rows.map(([icon, label, value]) => (
+          <div className="review-row" key={label}>
+            <span className="rr-icon"><i className={`fa-solid ${icon}`} /></span>
+            <span className="rr-label">{label}</span>
+            <span className="rr-value">{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function App() {
@@ -371,8 +400,33 @@ function App() {
   const [testState, setTestState] = useState('idle');
   const [testError, setTestError] = useState('');
   const [slugCheck, setSlugCheck] = useState({ state: 'idle', slug: '', message: '' });
+  const [step, setStep] = useState(0);
+  const currentStep = WIZARD.STEPS[step];
+  const goto = (n) => setStep(Math.max(0, Math.min(WIZARD.STEPS.length - 1, n)));
   const [showSettings, setShowSettings] = useState(false);
+  const [quickStartId, setQuickStartId] = useState('');
   const closeSettings = () => setShowSettings(false);
+  // First-run guide: shown until an org token exists or the user dismisses it.
+  const [guideDismissed, setGuideDismissed] = useState(() => {
+    try { return window.localStorage?.getItem('mkEvent.onboarding.firstRunGuideDismissed') === '1'; }
+    catch (_) { return true; }
+  });
+  const dismissGuide = () => {
+    setGuideDismissed(true);
+    try { window.localStorage?.setItem('mkEvent.onboarding.firstRunGuideDismissed', '1'); } catch (_) { /* ignore */ }
+  };
+  const [theme, setTheme] = useState(() => {
+    let initial = 'light';
+    try { initial = window.localStorage?.getItem('mkEvent.onboarding.theme') || 'light'; }
+    catch (_) { initial = 'light'; }
+    // Apply during render so the saved theme is on the DOM before first paint (no light flash).
+    document.documentElement.setAttribute('data-theme', initial);
+    return initial;
+  });
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    try { window.localStorage?.setItem('mkEvent.onboarding.theme', theme); } catch (_) { /* ignore */ }
+  }, [theme]);
   useEffect(() => { setTestState('idle'); setTestError(''); },
     [cfg.api.env, cfg.api.organizationId, cfg.api.orgToken, cfg.api.baseUrl]);
   useEffect(() => { setSlugCheck({ state: 'idle', slug: '', message: '' }); },
@@ -534,81 +588,71 @@ function App() {
     }
   };
 
+  const renderStepBody = () => {
+    switch (currentStep.id) {
+      case 'connect':
+        return <ConnectStep cfg={cfg} set={set} switchEnv={switchEnv} onQuickStart={(preset) => {
+          if (preset.id === 'stocked') setCfg((current) => EVENT_MODEL.importRecipeConfig(current, STOCKED_RECIPE));
+          else WIZARD.applyQuickStart(setCfg, preset);
+          setQuickStartId(preset.id);
+        }} activeQuickStart={quickStartId} onTest={testConnection} testState={testState} testError={testError} />;
+      case 'basics':
+        return <BasicsBody data={cfg.basics} set={set('basics')} slugCheck={slugCheck} onCheckSlug={checkSlugAvailability} />;
+      case 'bidders':
+        return <BiddersBody data={cfg.bidders} set={set('bidders')} />;
+      case 'items':
+        return <ItemsBody data={cfg.items} set={set('items')} />;
+      case 'auction':
+        return <AuctionSettingsBody data={cfg.auctionSettings} bidders={cfg.bidders} set={set('auctionSettings')} />;
+      case 'tickets':
+        return <TicketPagesBody data={cfg.ticketPages} items={cfg.items} set={set('ticketPages')} basics={cfg.basics} api={cfg.api} />;
+      case 'activity':
+        return <PostCreateActivityBody data={cfg.postCreateActivity} ticketPages={cfg.ticketPages} set={set('postCreateActivity')} />;
+      case 'review':
+        return <ReviewStep summary={summary} cfg={cfg} />;
+      default:
+        return null;
+    }
+  };
+
   return (
     <>
       <AppTop cfg={cfg} onOpenSettings={() => setShowSettings(true)} />
-      <div className="page" data-screen-label="QA Event creator">
-        <div className="page-head">
-        <div>
-          <div className="eyebrow-mini">Create QA event</div>
-          <h1 className="page-title">New QA event configuration</h1>
-          <p className="page-sub">Choose the environment, set the event basics, then mix bulk-generated and exact bidders/items inside each section. Customer-facing pages use ClickBid defaults.</p>
-          <ConfigToolbar
-            presets={savedPresets}
-            selectedPresetId={selectedPresetId}
-            onSelectPreset={loadPreset}
-            onSavePreset={savePreset}
-            onDeletePreset={deletePreset}
-            onImportRecipe={() => importInputRef.current?.click()}
-            onExportRecipe={exportRecipe}
-          />
+      {!guideDismissed && !cfg.api.orgToken && !showSettings && (
+        <div className="coach-mark" role="note" aria-label="First-time setup">
+          <span className="coach-arrow" />
+          <div className="coach-title"><i className="fa-solid fa-wand-magic-sparkles" /> First-time setup</div>
+          <ol>
+            <li>Raise your org&apos;s event cap first — creation fails once it&apos;s hit: <span className="coach-path">Organization page → Admin → Organization Settings → <strong>Max # of Active Events</strong></span></li>
+            <li>Create and copy an org token: <span className="coach-path">API Settings → Create Token → For: <strong>Organization</strong></span></li>
+            <li>Paste it in mkEvent&apos;s <strong>Settings</strong> (the gear above).</li>
+          </ol>
+          <div className="coach-actions">
+            <button className="btn btn-primary btn-sm" onClick={() => setShowSettings(true)}>Open Settings</button>
+            <button className="btn btn-ghost btn-sm" onClick={dismissGuide}>Dismiss</button>
+          </div>
         </div>
+      )}
+      <div className="wizard">
+        <StepRail cfg={cfg} slugCheck={slugCheck} step={step} onJump={goto} />
+        <StepCard step={currentStep}>
+          {renderStepBody()}
+          <WizardFooter
+            step={step}
+            canCreate={WIZARD.canCreateEvent(cfg, slugCheck)}
+            onBack={() => goto(step - 1)}
+            onNext={() => goto(step + 1)}
+            onSkip={() => goto(WIZARD.STEPS.length - 1)}
+            onCreate={openRunModal}
+          />
+        </StepCard>
       </div>
-
-        <Section icon="fa-server" title="Environment" sub="Where the event will be created." defaultOpen summary={envSummary(cfg.api)}>
-          <EnvironmentBody data={cfg.api} set={set('api')} onSwitchEnv={switchEnv} />
-        </Section>
-
-        <Section icon="fa-circle-info" title="Event basics" sub="Name, slug, schedule." defaultOpen summary={basicsSummary(cfg.basics)}>
-          <BasicsBody data={cfg.basics} set={set('basics')} slugCheck={slugCheck} onCheckSlug={checkSlugAvailability} />
-        </Section>
-
-        <Section icon="fa-users" title="Bidders" sub="Generated bidder count and naming." summary={biddersSummary(cfg.bidders)}>
-          <BiddersBody data={cfg.bidders} set={set('bidders')} />
-        </Section>
-
-        <Section icon="fa-gavel" title="Items" sub="Bulk silent, live, donation, and quantity items." defaultOpen summary={itemsSummary(cfg.items)}>
-          <ItemsBody data={cfg.items} set={set('items')} />
-        </Section>
-
-        <Section icon="fa-sliders" title="Auction settings" sub="High-traffic admin toggles applied after event creation." defaultOpen summary={auctionSettingsSummary(cfg.auctionSettings)}>
-          <AuctionSettingsBody data={cfg.auctionSettings} bidders={cfg.bidders} set={set('auctionSettings')} />
-        </Section>
-
-        <Section icon="fa-ticket" title="Ticket pages" sub="Quick setup for ticket forms, ticket types, selections, and questions." summary={ticketPagesSummary(cfg.ticketPages)}>
-          <TicketPagesBody data={cfg.ticketPages} items={cfg.items} set={set('ticketPages')} basics={cfg.basics} api={cfg.api} />
-        </Section>
-
-        <Section icon="fa-cart-shopping" title="Post-create activity" sub="Optional public checkout seeding for guest and sales data." summary={postCreateActivitySummary(cfg.postCreateActivity, cfg.ticketPages)}>
-          <PostCreateActivityBody data={cfg.postCreateActivity} ticketPages={cfg.ticketPages} set={set('postCreateActivity')} />
-        </Section>
-      </div>
-      <AppFoot
-        cfg={cfg}
-        summary={summary}
-        slugCheck={slugCheck}
-        onCreate={openRunModal}
-      />
-      <input
-        ref={importInputRef}
-        type="file"
-        accept="application/json,.json"
-        onChange={importRecipe}
-        style={{ display: 'none' }}
-      />
+      <input ref={importInputRef} type="file" accept="application/json,.json" onChange={importRecipe} style={{ display: 'none' }} />
       {presetNameDraft !== null && (
-        <PresetNameModal
-          initialName={presetNameDraft}
-          onSave={confirmSavePreset}
-          onCancel={() => setPresetNameDraft(null)}
-        />
+        <PresetNameModal initialName={presetNameDraft} onSave={confirmSavePreset} onCancel={() => setPresetNameDraft(null)} />
       )}
       {runRequest && (
-        <RunModal
-          config={runRequest.config}
-          recipe={runRequest.recipe}
-          onClose={() => setRunRequest(null)}
-        />
+        <RunModal config={runRequest.config} recipe={runRequest.recipe} onClose={() => setRunRequest(null)} />
       )}
       {showSettings && (
         <>
@@ -616,19 +660,51 @@ function App() {
           <aside className="settings-aside" role="dialog" aria-label="Settings">
             <div className="settings-aside-head">
               <h2>Settings</h2>
-              <button className="btn btn-ghost btn-sm" onClick={closeSettings} aria-label="Close settings"><i className="fa-solid fa-xmark"></i></button>
+              <button className="btn btn-ghost btn-sm" onClick={closeSettings} aria-label="Close settings"><i className="fa-solid fa-xmark" /></button>
             </div>
             <div className="settings-aside-body">
-              <SettingsBody
-                data={cfg.api}
-                set={set('api')}
-                onTestConnection={testConnection}
-                testState={testState}
-                testError={testError}
-                onSaveProfile={saveApiProfile}
-                onLoadProfile={loadApiProfile}
-                onDeleteProfile={deleteApiProfile}
-              />
+              <section className="drawer-section">
+                <h3 className="drawer-h">Appearance</h3>
+                <div className="theme-toggle" role="group" aria-label="Theme">
+                  <button type="button" className={theme === 'light' ? 'is-active' : ''} onClick={() => setTheme('light')}>
+                    <i className="fa-solid fa-sun" /> Light
+                  </button>
+                  <button type="button" className={theme === 'dark' ? 'is-active' : ''} onClick={() => setTheme('dark')}>
+                    <i className="fa-solid fa-moon" /> Dark
+                  </button>
+                </div>
+              </section>
+
+              <section className="drawer-section">
+                <h3 className="drawer-h">Presets &amp; recipes</h3>
+                <div className="drawer-presets">
+                  <PresetPicker presets={savedPresets} selectedPresetId={selectedPresetId} onSelectPreset={loadPreset} />
+                  <div className="drawer-preset-actions">
+                    <button className="btn btn-outline btn-sm" onClick={savePreset}><i className="fa-regular fa-bookmark" /> Save preset</button>
+                    <button className="btn btn-outline btn-sm" disabled={!selectedPresetId} onClick={deletePreset}><i className="fa-regular fa-trash-can" /> Delete</button>
+                    <button className="btn btn-outline btn-sm" onClick={() => importInputRef.current?.click()}><i className="fa-solid fa-file-import" /> Import recipe</button>
+                    <button className="btn btn-outline btn-sm" onClick={exportRecipe}><i className="fa-regular fa-floppy-disk" /> Export recipe</button>
+                  </div>
+                </div>
+              </section>
+
+              <section className="drawer-section">
+                <div className="drawer-h-row">
+                  <h3 className="drawer-h">Connection</h3>
+                  {guideDismissed && !(cfg.api.orgToken && cfg.api.selectedProfileId) && (
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => {
+                        setGuideDismissed(false);
+                        try { window.localStorage?.removeItem('mkEvent.onboarding.firstRunGuideDismissed'); } catch (_) { /* ignore */ }
+                      }}
+                    >
+                      <i className="fa-solid fa-wand-magic-sparkles" /> Show setup guide
+                    </button>
+                  )}
+                </div>
+                <SettingsBody data={cfg.api} set={set('api')} onTestConnection={testConnection} testState={testState} testError={testError} onSaveProfile={saveApiProfile} onLoadProfile={loadApiProfile} onDeleteProfile={deleteApiProfile} guide={!guideDismissed && !(cfg.api.orgToken && cfg.api.selectedProfileId)} />
+              </section>
             </div>
           </aside>
         </>
