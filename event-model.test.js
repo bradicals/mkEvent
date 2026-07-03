@@ -86,6 +86,12 @@ test('importRecipeConfig updates stale imported dates to visible safe values', (
 });
 
 test('preset export/import reuses recipe structure but preserves current event identity fields', () => {
+  // Relative dates: importPresetConfig clamps the preserved schedule to today
+  // (normalizeEventSchedule), so hardcoded dates break once the calendar
+  // passes them.
+  const daysOut = (days) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
+  const currentStart = daysOut(30);
+  const currentEnd = daysOut(31);
   const base = {
     ...model.DEFAULT_CONFIG,
     api: {
@@ -96,11 +102,11 @@ test('preset export/import reuses recipe structure but preserves current event i
       ...model.DEFAULT_CONFIG.basics,
       name: 'Current Event Name',
       slug: 'currenteventname',
-      startDate: '2026-06-10',
+      startDate: currentStart,
       startTime: '09:00',
-      endDate: '2026-06-11',
+      endDate: currentEnd,
       endTime: '17:00',
-      onCallDate: '2026-06-11',
+      onCallDate: currentEnd,
     },
     bidders: {
       ...model.DEFAULT_CONFIG.bidders,
@@ -118,9 +124,9 @@ test('preset export/import reuses recipe structure but preserves current event i
       ...base.basics,
       name: 'Preset Event Name',
       slug: 'preseteventname',
-      startDate: '2026-08-01',
-      endDate: '2026-08-02',
-      onCallDate: '2026-08-02',
+      startDate: daysOut(60),
+      endDate: daysOut(61),
+      onCallDate: daysOut(61),
     },
     bidders: {
       ...base.bidders,
@@ -140,7 +146,7 @@ test('preset export/import reuses recipe structure but preserves current event i
   const imported = model.importPresetConfig(base, preset);
   assert.equal(imported.basics.name, 'Current Event Name');
   assert.equal(imported.basics.slug, 'currenteventname');
-  assert.equal(imported.basics.startDate, '2026-06-10');
+  assert.equal(imported.basics.startDate, currentStart);
   assert.equal(imported.items.bulk.silentCount, 3);
   assert.equal(imported.items.bulk.liveCount, 2);
   assert.equal(imported.bidders.bulk.count, 7);
