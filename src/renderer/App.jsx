@@ -32,12 +32,43 @@ function legacySettingsKey(env) {
   return `mkEvent.localSettings.v2.${env || 'stage'}`;
 }
 
+// Encrypted settings store (issue #10): in Electron, connection settings
+// (tokens + admin credentials) are stored via safeStorage instead of plaintext
+// localStorage. Plain-browser dev (no preload) or an OS without encryption
+// support falls back to the old localStorage behavior.
+const SECURE = window.mkEventDesktop?.secureSettings;
+const SECURE_ON = Boolean(SECURE?.isAvailable?.());
+
+function readPlaintextSettings(env) {
+  return window.localStorage?.getItem(settingsKey())
+    || window.localStorage?.getItem(legacySettingsKey(env))
+    || window.localStorage?.getItem('mkEvent.localSettings.v1');
+}
+
+function purgePlaintextSettings() {
+  try {
+    const doomed = [];
+    for (let i = 0; i < window.localStorage.length; i += 1) {
+      const key = window.localStorage.key(i);
+      if (key && key.startsWith('mkEvent.localSettings')) doomed.push(key);
+    }
+    doomed.forEach((key) => window.localStorage.removeItem(key));
+  } catch (_) { /* ignore */ }
+}
+
 function loadInitialConfig() {
   const defaults = cloneDefaultConfig();
   try {
-    const saved = window.localStorage?.getItem(settingsKey())
-      || window.localStorage?.getItem(legacySettingsKey(defaults.api.env))
-      || window.localStorage?.getItem('mkEvent.localSettings.v1');
+    let saved = SECURE_ON ? SECURE.load() : null;
+    if (!saved) {
+      saved = readPlaintextSettings(defaults.api.env);
+      if (saved && SECURE_ON) {
+        // One-time migration: move plaintext settings into the encrypted
+        // store, then delete every plaintext copy.
+        SECURE.save(saved);
+        purgePlaintextSettings();
+      }
+    }
     return saved ? EVENT_MODEL.importLocalSettings(defaults, JSON.parse(saved)) : defaults;
   } catch (error) {
     console.warn('Could not load mkEvent local settings:', error);
@@ -47,7 +78,9 @@ function loadInitialConfig() {
 
 function saveLocalSettings(cfg) {
   try {
-    window.localStorage?.setItem(settingsKey(), JSON.stringify(EVENT_MODEL.exportLocalSettings(cfg)));
+    const json = JSON.stringify(EVENT_MODEL.exportLocalSettings(cfg));
+    if (SECURE_ON) SECURE.save(json);
+    else window.localStorage?.setItem(settingsKey(), json);
   } catch (error) {
     console.warn('Could not save mkEvent local settings:', error);
   }
@@ -100,8 +133,7 @@ function useConfig() {
         },
       };
       try {
-        const saved = window.localStorage?.getItem(settingsKey())
-          || window.localStorage?.getItem(legacySettingsKey(newEnv));
+        const saved = (SECURE_ON ? SECURE.load() : null) || readPlaintextSettings(newEnv);
         if (saved) {
           return EVENT_MODEL.importLocalSettings(nextBase, JSON.parse(saved));
         }

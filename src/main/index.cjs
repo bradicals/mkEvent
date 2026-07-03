@@ -1,6 +1,37 @@
-const { app, BrowserWindow, Menu, dialog, screen } = require('electron');
+const { app, BrowserWindow, Menu, dialog, screen, ipcMain, safeStorage } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { startProxy, stopProxy, getProxyState } = require('./proxy-manager.cjs');
+
+// Encrypted settings store (issue #10): the renderer's connection settings
+// (org/event tokens, admin credentials) are encrypted with the OS user's
+// credentials via safeStorage and kept out of plaintext localStorage.
+// Sync IPC because the renderer loads settings synchronously at first paint;
+// the file is tiny. ponytail: sendSync load, async refactor if it ever blocks.
+function secureSettingsFile() {
+  return path.join(app.getPath('userData'), 'secure-settings.bin');
+}
+
+ipcMain.on('secure-settings:available', (event) => {
+  event.returnValue = safeStorage.isEncryptionAvailable();
+});
+
+ipcMain.on('secure-settings:load', (event) => {
+  try {
+    event.returnValue = safeStorage.decryptString(fs.readFileSync(secureSettingsFile()));
+  } catch (_) {
+    // No file yet, or decryption key changed — renderer falls back to defaults.
+    event.returnValue = null;
+  }
+});
+
+ipcMain.on('secure-settings:save', (_event, json) => {
+  try {
+    fs.writeFileSync(secureSettingsFile(), safeStorage.encryptString(String(json)));
+  } catch (err) {
+    console.warn('secure-settings save failed:', err.message);
+  }
+});
 
 const isDev = Boolean(process.env.MKEVENT_RENDERER_URL);
 const isSmokeCheck = process.argv.includes('--smoke-check');
