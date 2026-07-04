@@ -1252,6 +1252,35 @@ test('httpCreateEvent posts to the http create endpoint', async () => {
   }
 });
 
+test('httpCreateEvent re-attaches eventLikelyCreated from the error envelope', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = async () => ({
+    ok: false,
+    status: 502,
+    json: async () => ({ ok: false, error: 'http_admin_error', message: 'created but no id read back', eventLikelyCreated: true }),
+  });
+
+  try {
+    await assert.rejects(
+      model.httpCreateEvent('http://localhost:9999/proxy', { event: { slug: 'qa-http' } }),
+      (err) => err.eventLikelyCreated === true && /created but no id/.test(err.message),
+    );
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('normalizeTicketPages is idempotent for page-level custom questions', () => {
+  const once = model.normalizeTicketPages({
+    enabled: true,
+    pages: [{ formName: 'tix', customQuestions: [{ question: 'Dietary needs', type: 'text' }] }],
+  });
+  assert.equal(once.pages[0].pageCustomQuestions.length, 1);
+  const twice = model.normalizeTicketPages(once);
+  assert.equal(twice.pages[0].pageCustomQuestions.length, 1);
+  assert.equal(twice.pages[0].pageCustomQuestions[0].question, 'Dietary needs');
+});
+
 test('httpApplyPostItemConfig posts to the http post-item-config endpoint', async () => {
   const originalFetch = global.fetch;
   let capturedUrl;

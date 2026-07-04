@@ -247,6 +247,28 @@ test('POST /fallback/create-event-http dispatches to runHttpAdmin and returns re
   });
 });
 
+test('POST /fallback/create-event-http carries eventLikelyCreated through the error envelope', async () => {
+  const stub = async () => {
+    const err = new Error('created but no id read back');
+    err.eventLikelyCreated = true;
+    throw err;
+  };
+  await withProxy({ runHttpAdmin: stub }, async (proxyBase) => {
+    const res = await fetch(`${proxyBase}/fallback/create-event-http`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        baseUrl: 'http://127.0.0.1', organizationId: '2518',
+        adminEmail: 'a', adminPassword: 'p', event: { slug: 'x' },
+      }),
+    });
+    const json = await res.json();
+    assert.strictEqual(res.status, 502);
+    assert.strictEqual(json.error, 'http_admin_error');
+    assert.strictEqual(json.eventLikelyCreated, true);
+  });
+});
+
 test('POST /fallback/create-event-http rejects non-allowlisted host with 403', async () => {
   const stub = async () => ({ ok: true });
   await withProxy({ runHttpAdmin: stub }, async (proxyBase) => {

@@ -613,7 +613,8 @@
         donationItemExactIndexes: (Array.isArray(page.donationItemExactIndexes) ? page.donationItemExactIndexes : [])
           .map((index) => Math.max(0, Number(index) || 0))
           .filter((value, index, array) => array.indexOf(value) === index),
-        pageCustomQuestions: normalizeCustomQuestions(page.customQuestions),
+        // Accept both keys so re-normalizing already-normalized state is idempotent.
+        pageCustomQuestions: normalizeCustomQuestions(page.pageCustomQuestions ?? page.customQuestions),
       };
     });
 
@@ -1767,7 +1768,10 @@
     let data;
     try { data = await response.json(); } catch (_) { const t = await response.text().catch(() => ''); throw new Error(t || `HTTP create failed with HTTP ${response.status}`); }
     if (response.ok && data?.ok) return data;
-    throw new Error(data?.message || data?.error || `HTTP create failed with HTTP ${response.status}`);
+    const err = new Error(data?.message || data?.error || `HTTP create failed with HTTP ${response.status}`);
+    // Re-attach the duplicate-event guard flag carried through the JSON envelope.
+    if (data?.eventLikelyCreated) err.eventLikelyCreated = true;
+    throw err;
   }
 
   async function httpApplyPostItemConfig(proxyUrl, payload) {
