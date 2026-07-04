@@ -162,7 +162,6 @@
       publicBaseUrl: 'https://cbo.bid',
       organizationId: '',
       orgToken: '',
-      eventToken: '',
       browser: 'chromium',
       adminEmail: '',
       adminPassword: '',
@@ -1190,7 +1189,6 @@
         publicBaseUrl: baseUrl,
         organizationId: config.api.organizationId,
         hasOrgToken: Boolean(config.api.orgToken),
-        hasEventToken: Boolean(config.api.eventToken),
       },
       event: {
         name: config.basics.name,
@@ -1293,7 +1291,6 @@
         ...apiPatch,
         organizationId: currentConfig.api.organizationId,
         orgToken: currentConfig.api.orgToken,
-        eventToken: currentConfig.api.eventToken,
         browser: currentConfig.api.browser,
         adminEmail: currentConfig.api.adminEmail,
         adminPassword: currentConfig.api.adminPassword,
@@ -1365,7 +1362,6 @@
             organizationId,
             label: String(profile?.label || '').trim(),
             orgToken: String(profile?.orgToken || ''),
-            eventToken: String(profile?.eventToken || ''),
           }];
         })
         .filter(Boolean)
@@ -1427,7 +1423,6 @@
               organizationId: String(legacyApi.organizationId || ''),
               label: '',
               orgToken: String(legacyApi.orgToken || ''),
-              eventToken: String(legacyApi.eventToken || ''),
             },
           }
         : {};
@@ -1439,7 +1434,6 @@
           ...apiPatch,
           organizationId: legacyApi.organizationId || '',
           orgToken: legacyApi.orgToken || '',
-          eventToken: legacyApi.eventToken || '',
           browser: legacyApi.browser || currentConfig.api.browser,
           adminEmail: legacyApi.adminEmail || '',
           adminPassword: legacyApi.adminPassword || '',
@@ -1466,7 +1460,6 @@
         ...apiPatch,
         organizationId: selectedProfile?.organizationId || '',
         orgToken: selectedProfile?.orgToken || '',
-        eventToken: selectedProfile?.eventToken || '',
         browser: globals.browser || currentConfig.api.browser,
         adminEmail: globals.adminEmail || '',
         adminPassword: globals.adminPassword || '',
@@ -1495,7 +1488,6 @@
         organizationId,
         label: String(currentConfig?.api?.profileLabel || '').trim(),
         orgToken: String(currentConfig?.api?.orgToken || ''),
-        eventToken: String(currentConfig?.api?.eventToken || ''),
       },
     };
 
@@ -1526,7 +1518,6 @@
           ...currentConfig.api,
           organizationId: '',
           orgToken: '',
-          eventToken: '',
           selectedProfileId: '',
           selectedProfileByEnv: nextSelectedByEnv,
           profileLabel: '',
@@ -1542,7 +1533,6 @@
         ...currentConfig.api,
         organizationId: profile.organizationId,
         orgToken: profile.orgToken,
-        eventToken: profile.eventToken,
         selectedProfileId: profileId,
         selectedProfileByEnv: {
           ...normalizeSelectedProfileMap(currentConfig.api.selectedProfileByEnv),
@@ -1575,7 +1565,6 @@
         ...currentConfig.api,
         organizationId: clearingCurrent && profile.env === env ? '' : currentConfig.api.organizationId,
         orgToken: clearingCurrent && profile.env === env ? '' : currentConfig.api.orgToken,
-        eventToken: clearingCurrent && profile.env === env ? '' : currentConfig.api.eventToken,
         selectedProfileId: clearingCurrent && profile.env === env ? '' : currentConfig.api.selectedProfileId,
         selectedProfileByEnv: nextSelectedByEnv,
         savedProfiles: nextProfiles,

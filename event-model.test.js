@@ -625,7 +625,6 @@ test('exportRecipeConfig excludes tokens and importRecipeConfig preserves local 
       env: 'dev2',
       organizationId: '2716',
       orgToken: 'secret-org-token',
-      eventToken: 'secret-event-token',
       browser: 'firefox',
       adminEmail: 'admin@example.test',
       adminPassword: 'secret-browser-password',
@@ -649,7 +648,6 @@ test('exportRecipeConfig excludes tokens and importRecipeConfig preserves local 
   assert.equal(exported.bidders.bulk.count, 7);
   assert.equal(exported.bidders.exact.records.length, 1);
   assert.equal(JSON.stringify(exported).includes('secret-org-token'), false);
-  assert.equal(JSON.stringify(exported).includes('secret-event-token'), false);
 
   const imported = model.importRecipeConfig(current, {
     environment: { id: 'dev4', baseUrl: 'https://malicious.example' },
@@ -669,7 +667,6 @@ test('exportRecipeConfig excludes tokens and importRecipeConfig preserves local 
   assert.equal(imported.api.env, 'dev4');
   assert.equal(imported.api.baseUrl, 'https://cbodev4.com');
   assert.equal(imported.api.orgToken, 'secret-org-token');
-  assert.equal(imported.api.eventToken, 'secret-event-token');
   assert.equal(imported.api.browser, 'firefox');
   assert.equal(imported.api.adminEmail, 'admin@example.test');
   assert.equal(imported.api.adminPassword, 'secret-browser-password');
@@ -704,7 +701,6 @@ test('local settings persistence stores credentials separately from recipes', ()
       env: 'dev3',
       organizationId: 'local-org',
       orgToken: 'secret-org-token',
-      eventToken: 'secret-event-token',
       browser: 'webkit',
       adminEmail: 'admin@example.test',
       adminPassword: 'secret-browser-password',
@@ -724,7 +720,6 @@ test('local settings persistence stores credentials separately from recipes', ()
   assert.equal(saved.profiles['dev3::local-org'].env, 'dev3');
   assert.equal(saved.profiles['dev3::local-org'].organizationId, 'local-org');
   assert.equal(saved.profiles['dev3::local-org'].orgToken, 'secret-org-token');
-  assert.equal(saved.profiles['dev3::local-org'].eventToken, 'secret-event-token');
   assert.equal(saved.profiles['dev3::local-org'].label, 'Dev 3 Local Org');
   assert.equal(saved.selectedProfileByEnv.dev3, 'dev3::local-org');
   assert.equal(JSON.stringify(saved).includes('Should Not Persist'), false);
@@ -742,7 +737,6 @@ test('local settings persistence stores credentials separately from recipes', ()
   assert.equal(restored.api.apiBaseUrl, 'https://cbodev3.com/api/v4');
   assert.equal(restored.api.organizationId, 'local-org');
   assert.equal(restored.api.orgToken, 'secret-org-token');
-  assert.equal(restored.api.eventToken, 'secret-event-token');
   assert.equal(restored.api.browser, 'webkit');
   assert.equal(restored.api.adminEmail, 'admin@example.test');
   assert.equal(restored.api.adminPassword, 'secret-browser-password');
@@ -758,7 +752,6 @@ test('legacy local settings migrate into an env-specific org profile', () => {
       env: 'dev2',
       organizationId: '2159',
       orgToken: 'legacy-token',
-      eventToken: 'legacy-event-token',
       browser: 'firefox',
       adminEmail: 'admin@example.test',
       adminPassword: 'secret-browser-password',
@@ -785,7 +778,6 @@ test('saveApiProfile, applyApiProfile, and deleteApiProfile manage env-scoped or
       ...model.environmentPatch('stage'),
       organizationId: '2159',
       orgToken: 'stage-token',
-      eventToken: 'stage-event-token',
       profileLabel: 'Main Stage Org',
     },
   };
@@ -801,7 +793,6 @@ test('saveApiProfile, applyApiProfile, and deleteApiProfile manage env-scoped or
       ...model.environmentPatch('dev2'),
       organizationId: '9999',
       orgToken: 'dev2-token',
-      eventToken: 'dev2-event-token',
       profileLabel: 'Dev2 Org',
     },
   };

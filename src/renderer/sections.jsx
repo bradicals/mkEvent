@@ -1310,9 +1310,8 @@ export function PostCreateActivityBody({ data, ticketPages, set }) {
   );
 }
 
-export function SettingsBody({ data, set, onTestConnection, testState, testError, onSaveProfile, onLoadProfile, onDeleteProfile, guide = false }) {
+export function SettingsBody({ data, set, onSwitchEnv, onTestConnection, testState, testError, onSaveProfile, onLoadProfile, onDeleteProfile, guide = false }) {
   const [showOrg, setShowOrg] = useState(false);
-  const [showEvent, setShowEvent] = useState(false);
   // First-run guided checklist: steps check off from live state; the current
   // step's control gets a pulse highlight and is scrolled into view.
   const guideSteps = guide ? [
@@ -1355,6 +1354,15 @@ export function SettingsBody({ data, set, onTestConnection, testState, testError
         </div>
       )}
       <div className="field span-2">
+        <label>Environment <span className="req">*</span></label>
+        <select value={data.env} onChange={e => onSwitchEnv?.(e.target.value)}>
+          {Object.entries(MODEL.ENVIRONMENTS).map(([value, preset]) => (
+            <option key={value} value={value}>{preset.label}</option>
+          ))}
+        </select>
+        <div className="help">Profiles, tokens, and the connection test are all scoped to this environment. Pick it first.</div>
+      </div>
+      <div className="field span-2">
         <label>Environment base URL</label>
         <input type="text" value={currentBaseUrl} readOnly />
         <div className="help">Derived from the selected environment. URLs are locked to trusted QA presets.</div>
@@ -1395,7 +1403,7 @@ export function SettingsBody({ data, set, onTestConnection, testState, testError
             </option>
           ))}
         </select>
-        <div className="help">Profiles are scoped to the selected environment and save org/event bearer tokens only.</div>
+        <div className="help">Profiles are scoped to the selected environment and save the org bearer token only.</div>
       </div>
       <div className="field">
         <label>Profile label</label>
@@ -1418,15 +1426,6 @@ export function SettingsBody({ data, set, onTestConnection, testState, testError
           <input type={showOrg ? 'text' : 'password'} value={data.orgToken} onChange={e => set({ orgToken: e.target.value })} placeholder="Organization-scoped token" />
           <button onClick={() => setShowOrg(s => !s)} style={{ position: 'absolute', right: 8, top: 6, background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b', padding: 6 }}>
             <i className={`fa-regular ${showOrg ? 'fa-eye-slash' : 'fa-eye'}`}></i>
-          </button>
-        </div>
-      </div>
-      <div className="field">
-        <label>Event bearer token</label>
-        <div style={{ position: 'relative' }}>
-          <input type={showEvent ? 'text' : 'password'} value={data.eventToken} onChange={e => set({ eventToken: e.target.value })} placeholder="Optional after event creation" />
-          <button onClick={() => setShowEvent(s => !s)} style={{ position: 'absolute', right: 8, top: 6, background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b', padding: 6 }}>
-            <i className={`fa-regular ${showEvent ? 'fa-eye-slash' : 'fa-eye'}`}></i>
           </button>
         </div>
       </div>
@@ -1475,7 +1474,7 @@ export function SettingsBody({ data, set, onTestConnection, testState, testError
       <div className="field span-full">
         <div className="callout">
           <i className="fa-solid fa-key"></i>
-          <div>Org and event bearer tokens are saved as environment-specific org profiles on this workstation. Admin fallback credentials, proxy URL, and browser choice are global to the workstation. Exported event recipes do not include tokens. URLs are locked to trusted QA environment presets.</div>
+          <div>Org bearer tokens are saved as environment-specific org profiles on this workstation. Admin fallback credentials, proxy URL, and browser choice are global to the workstation. Exported event recipes do not include tokens. URLs are locked to trusted QA environment presets.</div>
         </div>
       </div>
     </div>

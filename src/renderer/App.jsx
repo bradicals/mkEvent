@@ -752,7 +752,7 @@ function App() {
                     </button>
                   )}
                 </div>
-                <SettingsBody data={cfg.api} set={set('api')} onTestConnection={testConnection} testState={testState} testError={testError} onSaveProfile={saveApiProfile} onLoadProfile={loadApiProfile} onDeleteProfile={deleteApiProfile} guide={!guideDismissed && !(cfg.api.orgToken && cfg.api.selectedProfileId)} />
+                <SettingsBody data={cfg.api} set={set('api')} onSwitchEnv={switchEnv} onTestConnection={testConnection} testState={testState} testError={testError} onSaveProfile={saveApiProfile} onLoadProfile={loadApiProfile} onDeleteProfile={deleteApiProfile} guide={!guideDismissed && !(cfg.api.orgToken && cfg.api.selectedProfileId)} />
               </section>
             </div>
           </aside>
