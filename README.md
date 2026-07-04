@@ -24,6 +24,20 @@ mkEvent ships as a single Windows installer — **no Node, Python, or other setu
    (and admin email/password if you use the browser fallback). These are stored
    locally on your machine only.
 
+## macOS install (for QA users)
+
+mkEvent also ships as a macOS disk image with everything bundled. **Apple Silicon (M-series) only — Intel Macs are not supported yet.**
+
+1. Download `mkEvent-<version>-arm64.dmg`, open it, and drag **mkEvent** to Applications.
+2. Because the app is not code-signed, a downloaded copy is blocked by Gatekeeper
+   on first launch — **right-click the app → Open → Open** (only needed once).
+3. Open **Settings** (gear icon, top-right), pick your environment, and enter your
+   ClickBid org token as on Windows. Tokens are encrypted with the macOS Keychain.
+
+Unlike Windows, the mac build has **no auto-update** (updates require Apple code
+signing). To update, install a newer dmg over the old app — the version number in
+the app header shows what you're running.
+
 ## How It Works
 
 - The Electron main process (`src/main/index.cjs`) auto-starts an **in-process Node proxy** (`src/main/proxy-server.cjs`) on `127.0.0.1:9999`, then opens the window.
@@ -35,7 +49,7 @@ mkEvent ships as a single Windows installer — **no Node, Python, or other setu
 
 For QA users running the installed app:
 
-- Windows 10 or 11
+- Windows 10 or 11, or macOS on Apple Silicon (Intel Macs not supported yet)
 - A valid ClickBid organization API token
 - For the browser fallback: admin email + admin password
 
@@ -87,6 +101,23 @@ This produces `release\mkEvent Setup <version>.exe` — a single, prerequisite-f
 A clean-room smoke test lives under `sandbox/`: with the Windows Sandbox feature enabled, double-click `sandbox\mkEvent-smoke.wsb` to silently install the app in a fresh VM and run `mkEvent.exe --smoke-check` (proxy health + Chromium launch). The verdict is written to `sandbox\results\result.txt`.
 
 > First build note: electron-builder extracts a `winCodeSign` helper that contains macOS symlinks. On Windows this needs symlink-create privilege — enable **Developer Mode** (Settings → System → For developers) or run the first build from an elevated terminal. Subsequent builds reuse the cache.
+
+## Build the macOS dmg
+
+Both installers bundle Playwright's browsers from a local `ms-playwright/` directory, which is platform-specific and not checked in. On a Mac, populate it once (and again after bumping the `playwright` dependency):
+
+```bash
+PLAYWRIGHT_BROWSERS_PATH=./ms-playwright npx playwright install chromium
+npm run dist:mac
+```
+
+This produces `release/mkEvent-<version>-arm64.dmg` — Apple Silicon only (Intel would need a separate `--x64` build and an x64 browser download). The app ships unsigned: fine for local installs, but downloaded copies need the right-click → Open dance, and auto-update is unavailable without an Apple Developer ID certificate.
+
+To sanity-check a packaged app end to end (proxy health + bundled Chromium launch):
+
+```bash
+./release/mac-arm64/mkEvent.app/Contents/MacOS/mkEvent --smoke-check --smoke-result=/tmp/mkevent-smoke.txt
+```
 
 ## Running Tests
 
