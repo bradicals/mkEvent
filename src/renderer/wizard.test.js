@@ -39,6 +39,16 @@ test('basics step ready needs all required fields', () => {
   assert.equal(wizard.stepReady(cfg, 'basics'), true);
 });
 
+test('basics step not ready with placeholder name/slug', () => {
+  const cfg = baseCfg();
+  cfg.basics = { ...fullBasics, name: 'QA Event', slug: 'qaevent' };
+  assert.equal(wizard.stepReady(cfg, 'basics'), false);
+  cfg.basics = { ...fullBasics, slug: 'qaevent' };
+  assert.equal(wizard.stepReady(cfg, 'basics'), false);
+  cfg.basics = { ...fullBasics, name: 'QA Event' };
+  assert.equal(wizard.stepReady(cfg, 'basics'), false);
+});
+
 test('optional steps are always ready', () => {
   const cfg = baseCfg();
   for (const id of ['bidders', 'items', 'auction', 'tickets', 'activity']) {
