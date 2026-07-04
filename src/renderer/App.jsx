@@ -147,7 +147,10 @@ function useConfig() {
         },
       };
       try {
-        const saved = (SECURE_ON ? loadSecureSettings() : null) || readPlaintextSettings(newEnv);
+        // Same rule as loadInitialConfig: after a decrypt failure the encrypted
+        // store stays authoritative — don't fall back to plaintext.
+        const saved = (SECURE_ON ? loadSecureSettings() : null)
+          || (secureLoadFailed ? null : readPlaintextSettings(newEnv));
         if (saved) {
           return EVENT_MODEL.importLocalSettings(nextBase, JSON.parse(saved));
         }
