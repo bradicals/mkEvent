@@ -174,7 +174,7 @@ function AppTop({ cfg, onOpenSettings }) {
       <div className="app-top-logo">
         <img src={clickbidMarkUrl} alt="ClickBid" />
         <span className="divider"></span>
-        <span className="product">mkEvent <span>· QA event creator</span></span>
+        <span className="product">mkEvent <span>· QA event creator · v{__APP_VERSION__}</span></span>
       </div>
       <div className="app-top-right">
         <button className={`api-pill ${apiConnected ? 'connected' : ''}`}>
