@@ -135,8 +135,8 @@ function sendProxyError(res, status, message, errorCode) {
   });
 }
 
-function sendFallbackError(res, status, message, errorCode) {
-  sendJson(res, status, { ok: false, error: errorCode || `http_${status}`, message: String(message) });
+function sendFallbackError(res, status, message, errorCode, extra) {
+  sendJson(res, status, { ok: false, error: errorCode || `http_${status}`, message: String(message), ...(extra || {}) });
 }
 
 function createProxyServer(options = {}) {
@@ -199,7 +199,10 @@ function createProxyServer(options = {}) {
             const result = await runHttpAdmin(action, body, allowlist);
             sendJson(res, 200, result);
           } catch (err) {
-            sendFallbackError(res, 502, (err && err.message) || 'http admin failed', 'http_admin_error');
+            // eventLikelyCreated must survive serialization: it's the renderer's
+            // signal not to retry via browser fallback and create a duplicate.
+            const extra = err && err.eventLikelyCreated ? { eventLikelyCreated: true } : undefined;
+            sendFallbackError(res, 502, (err && err.message) || 'http admin failed', 'http_admin_error', extra);
           }
           return;
         }

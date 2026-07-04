@@ -164,10 +164,10 @@
           }
         ],
         "quantityItemBulkIndexes": [
-          32,
-          33,
           60,
-          61
+          61,
+          62,
+          63
         ],
         "quantityItemExactIndexes": [],
         "donationItemBulkIndexes": [

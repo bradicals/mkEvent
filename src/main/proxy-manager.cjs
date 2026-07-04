@@ -128,6 +128,9 @@ function makeRunBrowserFallback(log) {
         catch (err) { finish(reject, new Error(`Browser fallback returned invalid JSON: ${err.message}`)); }
       });
 
+      // A child that dies before reading stdin emits EPIPE here; without a
+      // handler that's an uncaught exception that kills the main process.
+      child.stdin.on('error', (err) => { log('browser_fallback_stdin_error', { action: payload.action, message: err.message }); });
       child.stdin.write(JSON.stringify(payload));
       child.stdin.end();
     });

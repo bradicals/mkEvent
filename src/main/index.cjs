@@ -16,18 +16,29 @@ ipcMain.on('secure-settings:available', (event) => {
   event.returnValue = safeStorage.isEncryptionAvailable();
 });
 
+// Returns { ok, json }. ok:false means the file exists but couldn't be read or
+// decrypted (transient DPAPI/keychain failure, corrupt file) — the renderer must
+// NOT save over it, or a hiccup at launch wipes every stored token (issue #15).
 ipcMain.on('secure-settings:load', (event) => {
+  const file = secureSettingsFile();
+  if (!fs.existsSync(file)) {
+    event.returnValue = { ok: true, json: null };
+    return;
+  }
   try {
-    event.returnValue = safeStorage.decryptString(fs.readFileSync(secureSettingsFile()));
-  } catch (_) {
-    // No file yet, or decryption key changed — renderer falls back to defaults.
-    event.returnValue = null;
+    event.returnValue = { ok: true, json: safeStorage.decryptString(fs.readFileSync(file)) };
+  } catch (err) {
+    console.warn('secure-settings load failed:', err.message);
+    event.returnValue = { ok: false, json: null };
   }
 });
 
 ipcMain.on('secure-settings:save', (event, json) => {
   try {
-    fs.writeFileSync(secureSettingsFile(), safeStorage.encryptString(String(json)));
+    // Write-then-rename so a crash mid-write can't leave truncated ciphertext.
+    const file = secureSettingsFile();
+    fs.writeFileSync(`${file}.tmp`, safeStorage.encryptString(String(json)));
+    fs.renameSync(`${file}.tmp`, file);
     event.returnValue = true;
   } catch (err) {
     console.warn('secure-settings save failed:', err.message);
@@ -102,12 +113,23 @@ function createWindow() {
   return window;
 }
 
+// Retry a few times with backoff: the common bind failure is a previous
+// mkEvent.exe still releasing port 9999 during an update/relaunch (issue #16).
+async function startProxyWithRetry() {
+  let proxy = await startProxy();
+  for (let attempt = 0; attempt < 3 && !proxy.started; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    proxy = await startProxy();
+  }
+  return proxy;
+}
+
 async function boot() {
   if (app.isPackaged) {
     process.env.PLAYWRIGHT_BROWSERS_PATH = path.join(process.resourcesPath, 'ms-playwright');
   }
 
-  const proxy = await startProxy();
+  let proxy = await startProxyWithRetry();
 
   if (isSmokeCheck) {
     const { runSmokeCheck } = require('./smoke-check.cjs');
@@ -117,13 +139,24 @@ async function boot() {
     return;
   }
 
-  if (!proxy.started) {
-    dialog.showMessageBox({
+  // A dead proxy means every renderer request fails for the whole session, so
+  // never continue into a zombie app — the user retries (after freeing the
+  // port) or quits.
+  while (!proxy.started) {
+    const { response } = await dialog.showMessageBox({
       type: 'warning',
       title: 'mkEvent proxy',
       message: 'mkEvent could not start its local proxy.',
-      detail: proxy.reason || 'Please restart the app; if this persists, reinstall mkEvent.',
-    }).catch(() => undefined);
+      detail: `${proxy.reason || ''}\n\nPort 9999 may be held by another mkEvent (or dev) process. Close it, then choose Retry.`.trim(),
+      buttons: ['Retry', 'Quit'],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (response !== 0) {
+      app.exit(1);
+      return;
+    }
+    proxy = await startProxyWithRetry();
   }
 
   const window = createWindow();
