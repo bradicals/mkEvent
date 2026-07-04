@@ -1314,7 +1314,11 @@ export function SettingsBody({ data, set, onSwitchEnv, onTestConnection, testSta
   const [showOrg, setShowOrg] = useState(false);
   // First-run guided checklist: steps check off from live state; the current
   // step's control gets a pulse highlight and is scrolled into view.
+  // Env has a default (stage), so "done" can't come from the value alone —
+  // it checks off once the user touches the select or has moved on to creds.
+  const [envConfirmed, setEnvConfirmed] = useState(false);
   const guideSteps = guide ? [
+    { key: 'env', label: 'Pick the environment you are targeting', done: envConfirmed || Boolean(data.organizationId || data.orgToken) },
     { key: 'org', label: 'Enter your Organization ID', done: Boolean(data.organizationId) },
     { key: 'token', label: 'Paste your Organization API token', done: Boolean(data.orgToken) },
     // Optional: also checks off once the user moves on (test/save) so empty
@@ -1353,9 +1357,14 @@ export function SettingsBody({ data, set, onSwitchEnv, onTestConnection, testSta
           </div>
         </div>
       )}
-      <div className="field span-2">
+      <div className={`field span-2 ${guideStep === 'env' ? 'is-guided' : ''}`} ref={el => { guideRefs.current.env = el; }}>
         <label>Environment <span className="req">*</span></label>
-        <select value={data.env} onChange={e => onSwitchEnv?.(e.target.value)}>
+        {guideStep === 'env' && <div className="coach-inline"><i className="fa-solid fa-arrow-down" /> Your token only works on the environment it was issued for</div>}
+        <select
+          value={data.env}
+          onFocus={() => setEnvConfirmed(true)}
+          onChange={e => { setEnvConfirmed(true); onSwitchEnv?.(e.target.value); }}
+        >
           {Object.entries(MODEL.ENVIRONMENTS).map(([value, preset]) => (
             <option key={value} value={value}>{preset.label}</option>
           ))}
