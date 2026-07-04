@@ -1,44 +1,10 @@
-// Sections - reusable section card plus QA-focused settings bodies.
+// Sections - QA-focused settings bodies rendered inside the wizard's step cards.
 
 import React, { useEffect, useRef, useState } from 'react';
 import MODEL from '../shared/event-model.js';
 
 // Checked once at load — sendSync IPC, so don't call it per render.
 const SECURE_STORAGE_ON = Boolean(window.mkEventDesktop?.secureSettings?.isAvailable?.());
-
-export function Section({ icon, title, sub, summary, defaultOpen = false, children }) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <section className={`section ${open ? 'is-open' : ''}`}>
-      <header
-        className="section-head"
-        role="button"
-        tabIndex={0}
-        aria-expanded={open}
-        onClick={() => setOpen(o => !o)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            setOpen(o => !o);
-          }
-        }}
-      >
-        <div className="section-icon"><i className={`fa-solid ${icon}`}></i></div>
-        <div className="section-titles">
-          <h3 className="section-title">{title}</h3>
-          {sub && <p className="section-sub">{sub}</p>}
-        </div>
-        <div className="section-meta">{summary}</div>
-        <i className="fa-solid fa-chevron-down section-chev"></i>
-      </header>
-      {open && (
-        <div className="section-body">
-          <div className="section-body-inner">{children}</div>
-        </div>
-      )}
-    </section>
-  );
-}
 
 export function Switch({ on, onClick }) {
   return <div className={`switch ${on ? 'on' : ''}`} onClick={onClick} role="switch" aria-checked={on}></div>;

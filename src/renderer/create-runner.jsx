@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import CreationEngine from '../shared/creation-engine.js';
 import EventModel from '../shared/event-model.js';
 import DebugReport from '../shared/debug-report.js';
+import { version as APP_VERSION } from '../../package.json';
 
 export function RunModal({ config, recipe, onClose }) {
   const [lines, setLines] = useState([]);
@@ -138,7 +139,7 @@ export function RunModal({ config, recipe, onClose }) {
     }
 
     const report = DebugReport.buildDebugReport({
-      appVersion: '1.0.0',
+      appVersion: APP_VERSION,
       generatedAt: new Date().toISOString(),
       recipe,
       result,

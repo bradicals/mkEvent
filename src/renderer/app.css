@@ -42,16 +42,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent-cyan); bo
 .app-top .api-pill.connected .dot { background: var(--color-success); box-shadow: 0 0 0 3px rgba(34,197,94,0.18); }
 .app-top .api-pill.connected { color: #166534; border-color: #bbf7d0; background: #f0fdf4; }
 
-/* ---- Page shell ---- */
-.page {
-  max-width: 1180px; margin: 0 auto; padding: 28px 32px 96px;
-}
-.page-head { margin-bottom: 24px; display: flex; align-items: end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-.eyebrow-mini { font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-brand-primary-600); }
-.eyebrow-mini::after { content: ""; display: inline-block; width: 28px; height: 3px; background: var(--color-brand-primary-500); border-radius: 2px; margin-left: 10px; transform: translateY(-3px); }
-.page-title { font-size: 32px; font-weight: 700; color: var(--heading); margin: 6px 0 0; letter-spacing: -0.015em; }
-.page-sub { color: var(--muted); margin: 6px 0 0; font-size: 14px; max-width: 60ch; }
-.page-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
 .preset-picker { position: relative; min-width: 220px; }
 .preset-picker-trigger {
   width: 100%;
@@ -103,62 +93,19 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent-cyan); bo
 .preset-picker-item:hover { background: var(--prefix-bg); }
 .preset-picker-item.is-active { background: var(--chip-bg); color: var(--chip-fg); font-weight: 600; }
 
-/* ---- Card (collapsible section) ---- */
-.section {
-  background: var(--card-bg); border: 1px solid var(--card-border);
-  border-radius: 18px;
-  box-shadow: 0 18px 38px -28px rgba(7,82,156,0.15);
-  margin-bottom: 16px;
-  overflow: hidden;
-  transition: border-color 0.2s ease;
-}
-.section.is-open { border-color: var(--card-border); }
-
-.section-head {
-  display: flex; align-items: center; gap: 16px;
-  padding: 18px 24px;
-  cursor: pointer; user-select: none;
-  background: var(--card-bg);
-}
-.section-head:hover { background: var(--test-bg); }
-.section-icon {
-  width: 40px; height: 40px; border-radius: 10px;
-  background: var(--color-brand-primary-50);
-  color: var(--color-brand-primary-600);
-  display: flex; align-items: center; justify-content: center; font-size: 16px;
-  flex-shrink: 0;
-}
-.section.is-open .section-icon { background: var(--color-brand-navy-500); color: white; }
-.section-titles { flex: 1; min-width: 0; }
-.section-title { font-size: 16px; font-weight: 600; color: var(--heading); margin: 0; letter-spacing: -0.005em; }
-.section-sub { font-size: 13px; color: var(--muted); margin: 2px 0 0; }
-.section-meta { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
-.section-meta .pill { background: var(--chip-bg); padding: 4px 10px; border-radius: 9999px; }
-.section-meta .pill.brand { background: #c7ecff; color: #07529c; }
-.section-chev { color: var(--muted2); transition: transform 0.25s ease; font-size: 14px; }
-.section.is-open .section-chev { transform: rotate(180deg); color: #475569; }
-
-.section-body {
-  padding: 0 24px 24px;
-  border-top: 1px solid var(--divider);
-}
-.section-body-inner { padding-top: 22px; }
-
 /* ---- Form primitives ---- */
 .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
 .form-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
-.form-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
 .form-grid .span-2 { grid-column: span 2; }
 .form-grid .span-full { grid-column: 1 / -1; }
 @media (max-width: 720px) {
-  .form-grid, .form-grid.cols-3, .form-grid.cols-4 { grid-template-columns: 1fr; }
+  .form-grid, .form-grid.cols-3 { grid-template-columns: 1fr; }
   .form-grid .span-2 { grid-column: auto; }
 }
 
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .field label { font-size: 13px; font-weight: 500; color: var(--label); display: flex; align-items: center; gap: 6px; }
 .field label .req { color: var(--color-danger); }
-.field label .hint-icon { color: var(--muted2); font-size: 11px; }
 .field input[type="text"], .field input[type="number"], .field input[type="date"], .field input[type="time"], .field input[type="email"], .field input[type="password"], .field select, .field textarea {
   height: 40px; padding: 0 12px;
   border: 1px solid var(--input-border); border-radius: 8px;
@@ -209,7 +156,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent-cyan); bo
 
 /* Toggle switch */
 .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 14px; border: 1px solid var(--card-border); border-radius: 10px; background: var(--test-bg); }
-.toggle-row .lbl { font-size: 14px; font-weight: 500; color: var(--text); }
 .toggle-row .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
 /* Step "master enable" toggle: blue active tint in light, neutral raised panel in dark (avoids blue-on-navy monochrome). */
 .toggle-row.master { padding: 10px 14px; border-radius: 8px; background: transparent; border: 1px solid transparent; }
@@ -220,11 +166,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent-cyan); bo
 .switch.on { background: var(--color-brand-primary-500); }
 .switch.on::after { transform: translateX(16px); }
 
-/* Color swatches */
-.swatch-row { display: flex; gap: 8px; flex-wrap: wrap; }
-.swatch { width: 32px; height: 32px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; transition: transform 0.15s, border-color 0.15s; box-shadow: inset 0 0 0 1px rgba(15,23,42,0.06); }
-.swatch:hover { transform: translateY(-1px); }
-.swatch.active { border-color: white; box-shadow: 0 0 0 2px var(--color-brand-navy-500), inset 0 0 0 1px rgba(15,23,42,0.06); }
 
 /* Buttons */
 .btn { font-size: 14px; font-weight: 500; padding: 9px 16px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; justify-content: center; gap: 7px; line-height: 1; white-space: nowrap; }
@@ -245,20 +186,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent-cyan); bo
 .btn-lg { padding: 13px 22px; font-size: 15px; }
 
 /* Item rows */
-.item-stack { display: flex; flex-direction: column; gap: 10px; }
-.item-row { display: grid; grid-template-columns: 44px 1fr 140px 110px 90px 36px; gap: 12px; align-items: center; padding: 10px; border: 1px solid var(--card-border); border-radius: 12px; background: var(--test-bg); }
-.item-row .item-thumb { width: 44px; height: 44px; border-radius: 9px; background: var(--chip-bg); display: flex; align-items: center; justify-content: center; color: var(--chip-fg); font-size: 18px; }
-.item-row .item-name { font-size: 14px; font-weight: 600; color: var(--heading); }
-.item-row .item-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
-.item-row .item-cat { font-size: 12px; color: var(--muted); padding: 4px 10px; background: var(--chip-bg); border-radius: 9999px; text-align: center; }
-.item-row .item-money { font-size: 14px; font-weight: 600; color: var(--heading); text-align: right; font-variant-numeric: tabular-nums; }
-.item-row .item-money small { display: block; font-weight: 400; color: var(--muted); font-size: 11px; }
-.item-row .item-del { color: var(--muted2); background: transparent; border: none; cursor: pointer; padding: 6px; border-radius: 6px; }
-.item-row .item-del:hover { background: #fef2f2; color: #b91c1c; }
-
-.item-add-bar { display: flex; gap: 8px; flex-wrap: wrap; padding: 10px; border: 1px dashed var(--input-border); border-radius: 12px; background: var(--card-bg); }
-.item-add-bar .btn { flex: 1; min-width: 130px; }
-.item-add-bar .btn i { color: var(--color-brand-primary-500); }
 
 .item-empty { padding: 28px 16px; text-align: center; color: var(--muted); font-size: 13px; border: 1px dashed var(--input-border); border-radius: 12px; background: var(--test-bg); }
 .item-empty i { display: block; font-size: 24px; color: var(--muted2); margin-bottom: 8px; }
@@ -335,7 +262,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent-cyan); bo
 .preset-modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 20px; border-top: 1px solid var(--card-border); background: var(--prefix-bg); }
 
 /* misc */
-.divider-h { height: 1px; background: var(--divider); margin: 18px 0; }
 .callout { display: flex; gap: 12px; padding: 12px 14px; border-radius: 10px; background: #f0f9ff; border: 1px solid #bae6fd; color: #075985; font-size: 13px; line-height: 1.5; }
 .callout.warn { background: #fefce8; border-color: #fde68a; color: #854d0e; }
 .callout i { color: var(--color-brand-primary-500); margin-top: 2px; }
@@ -345,7 +271,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent-cyan); bo
 [data-theme="dark"] .callout i { color: #57c0ff; }
 [data-theme="dark"] .callout.warn { background: rgba(234, 179, 8, 0.12); border-color: rgba(234, 179, 8, 0.40); color: #f3d68a; }
 [data-theme="dark"] .callout.warn i { color: #f3d68a; }
-.code-inline { font-family: var(--font-mono); background: var(--chip-bg); padding: 1px 6px; border-radius: 4px; font-size: 12px; color: var(--label); }
 /* Theme the base code/kbd/pre chips (colors_and_type.css hard-codes a light fill). */
 code, kbd, pre { background: var(--chip-bg); border-color: var(--card-border); color: var(--chip-fg); }
 
