@@ -54,7 +54,8 @@
         "dmg"
       ],
       "icon": "assets/icon.icns",
-      "category": "public.app-category.developer-tools"
+      "category": "public.app-category.developer-tools",
+      "identity": null
     },
     "nsis": {
       "oneClick": false,
