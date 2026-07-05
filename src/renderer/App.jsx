@@ -174,7 +174,7 @@ function AppTop({ cfg, onOpenSettings }) {
       <div className="app-top-logo">
         <img src={clickbidMarkUrl} alt="ClickBid" />
         <span className="divider"></span>
-        <span className="product">mkEvent <span>· QA event creator</span></span>
+        <span className="product">mkEvent <span>· QA event creator · v{__APP_VERSION__}</span></span>
       </div>
       <div className="app-top-right">
         <button className={`api-pill ${apiConnected ? 'connected' : ''}`}>
@@ -752,7 +752,7 @@ function App() {
                     </button>
                   )}
                 </div>
-                <SettingsBody data={cfg.api} set={set('api')} onTestConnection={testConnection} testState={testState} testError={testError} onSaveProfile={saveApiProfile} onLoadProfile={loadApiProfile} onDeleteProfile={deleteApiProfile} guide={!guideDismissed && !(cfg.api.orgToken && cfg.api.selectedProfileId)} />
+                <SettingsBody data={cfg.api} set={set('api')} onSwitchEnv={switchEnv} onTestConnection={testConnection} testState={testState} testError={testError} onSaveProfile={saveApiProfile} onLoadProfile={loadApiProfile} onDeleteProfile={deleteApiProfile} guide={!guideDismissed && !(cfg.api.orgToken && cfg.api.selectedProfileId)} />
               </section>
             </div>
           </aside>

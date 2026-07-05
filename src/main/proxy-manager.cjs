@@ -24,7 +24,9 @@ function killProcessTree(pid) {
       // /T kills the whole tree (Chromium children), /F forces it.
       spawn('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore' });
     } else {
-      process.kill(pid, 'SIGKILL');
+      // Negative pid = the whole process group (Chromium grandchildren too).
+      // Children are spawned detached below so each leads its own group.
+      process.kill(-pid, 'SIGKILL');
     }
   } catch (_) { /* process already gone */ }
 }
@@ -97,6 +99,8 @@ function makeRunBrowserFallback(log) {
         cwd: resourceRoot(),
         env,
         stdio: ['pipe', 'pipe', 'pipe'],
+        // POSIX: own process group so killProcessTree(-pid) reaps Chromium too.
+        detached: process.platform !== 'win32',
       });
       childProcesses.add(child);
 

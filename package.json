@@ -11,6 +11,7 @@
     "electron:dev": "node scripts/electron-dev.mjs",
     "electron:start": "npm run build && electron .",
     "dist:win": "npm run build && electron-builder --win",
+    "dist:mac": "npm run build && electron-builder --mac",
     "release:win": "npm run build && electron-builder --win --publish always"
   },
   "build": {
@@ -47,6 +48,14 @@
         "nsis"
       ],
       "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.developer-tools",
+      "identity": null
     },
     "nsis": {
       "oneClick": false,
