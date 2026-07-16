@@ -1632,8 +1632,16 @@ async function applyButlerCheckouts(page, baseUrl, butlerCheckouts, bidders, app
   }
 
   // Admin page first, then butler pages — one navigation each.
-  const typeIds = await readCustomPaymentTypeIds(page, baseUrl);
-  const csrfToken = await fetchCsrfTokenFromButler(page, { baseUrl });
+  let typeIds;
+  let csrfToken;
+  try {
+    typeIds = await readCustomPaymentTypeIds(page, baseUrl);
+    csrfToken = await fetchCsrfTokenFromButler(page, { baseUrl });
+  } catch (error) {
+    warnings.push({ section: 'butlerCheckouts', message: `setup failed: ${error.message}` });
+    skipped.push({ section: 'butlerCheckouts', reason: 'setup failed (see warnings)' });
+    return;
+  }
 
   const { plan, warnings: planWarnings } = buildButlerCheckoutPlan(requested.perType, typeIds);
   warnings.push(...planWarnings);
