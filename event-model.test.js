@@ -899,6 +899,33 @@ test('admin fee description defaults blank and coerces to string', () => {
   assert.equal(model.normalizeAuctionSettings({ adminFeeDescription: 'Admin Fees Description' }).adminFeeDescription, 'Admin Fees Description');
 });
 
+test('custom payment types: stocked defaults, empty stays empty, comma string, trim/clamp/dedupe', () => {
+  assert.deepEqual(model.normalizeAuctionSettings().customPaymentTypes, ['Venmo', 'Zelle', 'Gift Card']);
+  assert.deepEqual(model.normalizeAuctionSettings({ customPaymentTypes: [] }).customPaymentTypes, []);
+  assert.deepEqual(
+    model.normalizeAuctionSettings({ customPaymentTypes: 'Venmo, PayPal ,  xy' }).customPaymentTypes,
+    ['Venmo', 'PayPal'],
+  );
+  assert.deepEqual(
+    model.normalizeAuctionSettings({ customPaymentTypes: ['Venmo', 'venmo', '  Zelle  '] }).customPaymentTypes,
+    ['Venmo', 'Zelle'],
+  );
+  const long = 'x'.repeat(120);
+  assert.equal(model.normalizeAuctionSettings({ customPaymentTypes: [long] }).customPaymentTypes[0].length, 100);
+});
+
+test('custom payment types round-trip through recipes and exports', () => {
+  const config = {
+    api: model.DEFAULT_CONFIG.api,
+    basics: { ...model.DEFAULT_CONFIG.basics, startDate: '2026-06-01', endDate: '2026-06-02', onCallDate: '2026-06-02' },
+    bidders: model.DEFAULT_CONFIG.bidders,
+    items: model.DEFAULT_CONFIG.items,
+    auctionSettings: { ...model.DEFAULT_CONFIG.auctionSettings, customPaymentTypes: ['Student Account'] },
+  };
+  assert.deepEqual(model.buildRecipe(config).auctionSettings.customPaymentTypes, ['Student Account']);
+  assert.deepEqual(model.exportRecipeConfig(config).auctionSettings.customPaymentTypes, ['Student Account']);
+});
+
 test('ticket pages default off and normalize basic/full presets for quick setup', () => {
   const off = model.normalizeTicketPages();
   assert.equal(off.enabled, false);

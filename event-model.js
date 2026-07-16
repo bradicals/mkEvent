@@ -241,6 +241,7 @@
       adminFeeDescription: '',
       enableCrypto: false,
       enableLink: false,
+      customPaymentTypes: ['Venmo', 'Zelle', 'Gift Card'],
     },
     ticketPages: {
       enabled: false,
@@ -457,6 +458,7 @@
       adminFeeDescription: String(base.adminFeeDescription ?? ''),
       enableCrypto: Boolean(base.enableCrypto),
       enableLink: Boolean(base.enableLink),
+      customPaymentTypes: normalizeCustomPaymentTypes(base.customPaymentTypes),
     };
   }
 
@@ -497,6 +499,30 @@
     return rawAnswers
       .map((answer) => clampString(answer, 80).trim())
       .filter(Boolean);
+  }
+
+  // Ticket 7720: per-event custom "Other" payment types. ClickBid validates
+  // name min:3/max:100, so mirror that here to keep seeding from 422ing.
+  function normalizeCustomPaymentTypes(value) {
+    if (value === undefined || value === null) {
+      return [...DEFAULT_CONFIG.auctionSettings.customPaymentTypes];
+    }
+    const raw = Array.isArray(value)
+      ? value
+      : typeof value === 'string'
+        ? value.split(',')
+        : [];
+    const seen = new Set();
+    const result = [];
+    raw.forEach((name) => {
+      const clean = clampString(name, 100).trim();
+      if (clean.length < 3) return;
+      const key = clean.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      result.push(clean);
+    });
+    return result;
   }
 
   function normalizeCustomQuestions(records) {
@@ -1833,6 +1859,7 @@
     importPresetConfig,
     importRecipeConfig,
     normalizeAuctionSettings,
+    normalizeCustomPaymentTypes,
     normalizeItemSection,
     normalizePostCreateActivity,
     normalizeTicketPages,
