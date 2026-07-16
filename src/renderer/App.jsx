@@ -167,6 +167,30 @@ function useConfig() {
   return [cfg, setSection, setCfg, switchEnv, saveApiProfile, loadApiProfile, deleteApiProfile];
 }
 
+function TitleBar() {
+  const controls = window.mkEventDesktop?.windowControls;
+  const [maximized, setMaximized] = useState(false);
+  useEffect(() => controls?.onMaximizedChange?.(setMaximized), []);
+  if (!controls) return null; // plain-browser dev has native chrome already
+
+  return (
+    <div className="titlebar">
+      <div className="titlebar-title">mkEvent</div>
+      <div className="titlebar-controls">
+        <button className="titlebar-btn" onClick={() => controls.minimize()} aria-label="Minimize">
+          <span className="mdl2">{'\uE921'}</span>
+        </button>
+        <button className="titlebar-btn" onClick={() => controls.maximizeToggle()} aria-label={maximized ? 'Restore' : 'Maximize'}>
+          <span className="mdl2">{maximized ? '\uE923' : '\uE922'}</span>
+        </button>
+        <button className="titlebar-btn titlebar-close" onClick={() => controls.close()} aria-label="Close">
+          <span className="mdl2">{'\uE8BB'}</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function AppTop({ cfg, onOpenSettings }) {
   const apiConnected = Boolean(cfg.api.orgToken && cfg.api.organizationId);
   return (
@@ -656,7 +680,7 @@ function App() {
       case 'tickets':
         return <TicketPagesBody data={cfg.ticketPages} items={cfg.items} set={set('ticketPages')} basics={cfg.basics} api={cfg.api} />;
       case 'activity':
-        return <PostCreateActivityBody data={cfg.postCreateActivity} ticketPages={cfg.ticketPages} set={set('postCreateActivity')} />;
+        return <PostCreateActivityBody data={cfg.postCreateActivity} ticketPages={cfg.ticketPages} auctionSettings={cfg.auctionSettings} set={set('postCreateActivity')} />;
       case 'review':
         return <ReviewStep summary={summary} cfg={cfg} />;
       default:
@@ -666,6 +690,7 @@ function App() {
 
   return (
     <>
+      <TitleBar />
       <AppTop cfg={cfg} onOpenSettings={() => setShowSettings(true)} />
       {!guideDismissed && !cfg.api.orgToken && !showSettings && (
         <div className="coach-mark" role="note" aria-label="First-time setup">

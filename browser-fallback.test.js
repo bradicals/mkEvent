@@ -663,3 +663,88 @@ test('ticketPurchaseConcurrencyForPlan uses browser concurrency for credit-card/
   // a plan with no credit-card purchases uses the fast API concurrency
   assert.equal(fallback.ticketPurchaseConcurrencyForPlan(['check', 'cash', 'invoice']), api);
 });
+
+test('seedCustomPaymentTypes posts each name in-page and records applied/warnings', async () => {
+  const calls = [];
+  const page = {
+    evaluate: async (_fn, arg) => {
+      calls.push(arg);
+      if (arg.typeName === 'xy') {
+        return { status: 422, body: { message: 'The name field must be at least 3 characters.' } };
+      }
+      return { status: 200, body: { success: true, custom_payment_type: { id: calls.length, name: arg.typeName } } };
+    },
+  };
+
+  const result = await fallback.seedCustomPaymentTypes(page, 'my-event', ['Venmo', 'xy', 'Zelle']);
+
+  assert.deepEqual(calls.map((c) => c.slug), ['my-event', 'my-event', 'my-event']);
+  assert.equal(result.applied.length, 2);
+  assert.equal(result.applied[0].name, 'Venmo');
+  assert.equal(result.applied[0].id, 1);
+  assert.equal(result.warnings.length, 1);
+  assert.match(result.warnings[0].message, /at least 3 characters/);
+});
+
+test('buildButlerCheckoutPlan expands per-type counts and warns on unknown types', () => {
+  const typeIds = new Map([
+    ['venmo', { id: '281', name: 'Venmo' }],
+    ['zelle', { id: '282', name: 'Zelle' }],
+  ]);
+  const { plan, warnings } = fallback.buildButlerCheckoutPlan({ Venmo: 2, Zelle: 1, Missing: 3 }, typeIds);
+
+  assert.deepEqual(plan, [
+    { typeName: 'Venmo', typeId: '281' },
+    { typeName: 'Venmo', typeId: '281' },
+    { typeName: 'Zelle', typeId: '282' },
+  ]);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0].message, /Missing/);
+});
+
+test('buildButlerCheckoutPlan rejects non-finite counts and caps expansion at maxTotal', () => {
+  const typeIds = new Map([
+    ['venmo', { id: '281', name: 'Venmo' }],
+    ['zelle', { id: '282', name: 'Zelle' }],
+  ]);
+
+  const infinite = fallback.buildButlerCheckoutPlan({ Venmo: Infinity, Zelle: 'Infinity' }, typeIds, 10);
+  assert.deepEqual(infinite.plan, []);
+  assert.equal(infinite.warnings.length, 2);
+  assert.match(infinite.warnings[0].message, /not a usable count/);
+
+  const oversized = fallback.buildButlerCheckoutPlan({ Venmo: 1e9, Zelle: 2 }, typeIds, 5);
+  assert.equal(oversized.plan.length, 5);
+  assert.ok(oversized.warnings.some((w) => /capped/.test(w.message)));
+});
+
+test('buildButlerCheckoutPostData computes totals from rows and JSON-stringifies them', () => {
+  const scraped = {
+    rows: [
+      { itemId: '644788', bidId: '1990465', taxable: '1', taxRate: '7', taxAmount: 1.75, typeId: 40, fmv: '0', quantityCount: '3', quantityPurchased: '1', subTotal: 25 },
+      { itemId: '644789', bidId: '1990466,1990467', taxable: '0', taxRate: '0', taxAmount: 0, typeId: 30, fmv: '0', quantityCount: 0, quantityPurchased: '', subTotal: 40 },
+    ],
+    firstName: 'QA', lastName: 'Automation',
+    address: '', address2: '', city: '', state: '', zip: '',
+    fmvAmount: 0, bidAmount: 25, donationAmount: 40,
+  };
+
+  const postData = fallback.buildButlerCheckoutPostData({
+    csrfToken: 'tok123', bidderId: 3398207, scraped, customPaymentTypeId: '281',
+  });
+
+  assert.equal(postData.action, 'checkout');
+  assert.equal(postData.csrf, 'tok123');
+  assert.equal(postData.bidderId, '3398207');
+  assert.equal(postData.payTypeId, '99');
+  assert.equal(postData.checkOutMethodId, '4');
+  assert.equal(postData.checkNumber, '');
+  assert.equal(postData.taxAmount, '1.75');
+  assert.equal(postData.totalAmount, '66.75'); // 25 + 1.75 + 40
+  assert.equal(postData.customPaymentTypeId, '281');
+  assert.equal(typeof postData.rows, 'string');
+  assert.equal(JSON.parse(postData.rows).length, 2);
+
+  const noType = fallback.buildButlerCheckoutPostData({ csrfToken: 't', bidderId: 1, scraped });
+  assert.equal('customPaymentTypeId' in noType, false);
+});

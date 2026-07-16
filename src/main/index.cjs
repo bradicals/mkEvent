@@ -46,6 +46,19 @@ ipcMain.on('secure-settings:save', (event, json) => {
   }
 });
 
+// Custom titlebar (frameless window): the renderer draws its own
+// minimize/maximize/close buttons and drives them over IPC.
+Menu.setApplicationMenu(null);
+
+ipcMain.on('window:minimize', (event) => BrowserWindow.fromWebContents(event.sender)?.minimize());
+ipcMain.on('window:maximize-toggle', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return;
+  if (win.isMaximized()) win.unmaximize();
+  else win.maximize();
+});
+ipcMain.on('window:close', (event) => BrowserWindow.fromWebContents(event.sender)?.close());
+
 const isDev = Boolean(process.env.MKEVENT_RENDERER_URL);
 const isSmokeCheck = process.argv.includes('--smoke-check');
 
@@ -72,6 +85,7 @@ function createWindow() {
   const window = new BrowserWindow({
     width,
     height,
+    frame: false,
     minWidth: 760,
     minHeight: 560,
     resizable: true,
@@ -86,6 +100,20 @@ function createWindow() {
   });
 
   window.loadURL(getRendererEntry());
+
+  window.on('maximize', () => window.webContents.send('window:maximized', true));
+  window.on('unmaximize', () => window.webContents.send('window:maximized', false));
+
+  // Menu.setApplicationMenu(null) also removes the default accelerators, so
+  // re-register the dev ones we actually use.
+  if (isDev) {
+    window.webContents.on('before-input-event', (_event, input) => {
+      if (input.type !== 'keyDown') return;
+      const key = String(input.key || '').toLowerCase();
+      if (key === 'f12' || (input.control && input.shift && key === 'i')) window.webContents.toggleDevTools();
+      else if (input.control && !input.shift && key === 'r') window.webContents.reload();
+    });
+  }
 
   // Standard right-click context menu (edit actions + inspect in dev).
   window.webContents.on('context-menu', (_event, params) => {

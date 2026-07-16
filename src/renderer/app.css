@@ -524,3 +524,43 @@ code, kbd, pre { background: var(--chip-bg); border-color: var(--card-border); c
 .rr-icon { width: 32px; height: 32px; border-radius: 8px; background: var(--chip-bg); color: var(--chip-fg); display: flex; align-items: center; justify-content: center; }
 .rr-label { font-size: 12.5px; color: var(--muted); }
 .rr-value { font-size: 14px; font-weight: 600; color: var(--heading); }
+
+/* Custom payment type chips (Auction Settings → Payments) */
+.chip-list { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-height: 28px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--chip-bg); color: var(--chip-fg);
+  border-radius: 9999px; padding: 4px 6px 4px 12px;
+  font-size: 12px; font-weight: 600;
+}
+.chip-remove {
+  border: 0; background: transparent; color: inherit; cursor: pointer;
+  border-radius: 9999px; width: 18px; height: 18px;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 11px;
+}
+.chip-remove:hover { background: #fef2f2; color: #b91c1c; }
+.chip-add { display: flex; gap: 8px; margin-top: 8px; }
+.chip-add input { flex: 1; }
+
+/* Custom window chrome (frameless Electron window) */
+.titlebar {
+  display: flex; align-items: center; justify-content: space-between;
+  height: 34px;
+  -webkit-app-region: drag;
+  user-select: none;
+  background: var(--topbar-bg);
+  border-bottom: 1px solid var(--topbar-border);
+  position: sticky; top: 0; z-index: 20;
+}
+.titlebar-title { padding: 0 14px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.titlebar-controls { display: flex; height: 100%; -webkit-app-region: no-drag; }
+.titlebar-btn {
+  width: 46px; height: 100%;
+  border: 0; background: transparent; color: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+}
+.titlebar-btn:hover { background: var(--chip-bg); color: var(--heading); }
+.titlebar-close:hover { background: #e81123; color: #fff; }
+.mdl2 { font-family: 'Segoe MDL2 Assets'; font-size: 10px; line-height: 1; }
+/* The app header sticks below the titlebar when the titlebar is present. */
+.titlebar + .app-top { top: 34px; }

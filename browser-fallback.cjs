@@ -241,6 +241,50 @@ async function stripeOnboardingPost(page, action) {
   }, action);
 }
 
+// Ticket 7720: create a per-event custom "Other" payment type via ClickBid's
+// Laravel endpoint. In-page fetch so session cookies + the page's csrf meta
+// ride along (mirrors ClickBid's own admin fetch helper).
+async function postCustomPaymentType(page, eventSlug, name) {
+  return page.evaluate(async ({ slug, typeName }) => {
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    const response = await fetch(`/app/public/admin/${slug}/custom-payment-types`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'X-CSRF-TOKEN': csrf,
+      },
+      body: JSON.stringify({ name: typeName }),
+    });
+    const text = await response.text();
+    let json = null;
+    try {
+      json = JSON.parse(text);
+    } catch (_) {
+      json = { success: false, message: text };
+    }
+    return { status: response.status, body: json };
+  }, { slug: eventSlug, typeName: name });
+}
+
+async function seedCustomPaymentTypes(page, eventSlug, names) {
+  const applied = [];
+  const warnings = [];
+  for (const name of (Array.isArray(names) ? names : [])) {
+    try {
+      const result = await postCustomPaymentType(page, eventSlug, name);
+      if (result.status < 400 && result.body?.success) {
+        applied.push({ setting: 'customPaymentTypes', applied: true, name, id: result.body?.custom_payment_type?.id });
+      } else {
+        warnings.push({ setting: 'customPaymentTypes', name, message: result.body?.message || `HTTP ${result.status}` });
+      }
+    } catch (error) {
+      warnings.push({ setting: 'customPaymentTypes', name, message: error.message });
+    }
+  }
+  return { applied, warnings };
+}
+
 async function assignExistingMerchantAccount(page) {
   process.stderr.write('[fallback] Checking for existing Stripe merchant account...\n');
   const check = await stripeOnboardingPost(page, 'check_existing_account');
@@ -369,7 +413,7 @@ async function fetchCsrfTokenFromButler(page, payload) {
   return csrfToken;
 }
 
-async function applyAuctionSettings(page, baseUrl, eventId, settings) {
+async function applyAuctionSettings(page, baseUrl, eventId, eventSlug, settings) {
   const requested = settings || {};
   if (requested.enabled === false) {
     return { applied: [], skipped: [{ section: 'auctionSettings', reason: 'disabled' }], warnings: [] };
@@ -447,6 +491,12 @@ async function applyAuctionSettings(page, baseUrl, eventId, settings) {
     } catch (error) {
       warnings.push({ selector: '[name="cc_fee_description"]', message: error.message });
     }
+  }
+
+  if (Array.isArray(requested.customPaymentTypes) && requested.customPaymentTypes.length) {
+    const seeded = await seedCustomPaymentTypes(page, eventSlug, requested.customPaymentTypes);
+    seeded.applied.forEach(record);
+    warnings.push(...seeded.warnings);
   }
 
   process.stderr.write(`[fallback] Auction settings applied=${applied.length}, skipped=${skipped.length}, warnings=${warnings.length}\n`);
@@ -1429,6 +1479,244 @@ function buildTicketPurchaseExecutionPlan(ticketPurchases) {
     plan.push(ticketPurchases?.paymentMethod || 'check');
   }
   return plan;
+}
+
+// maxTotal bounds plan expansion (each checkout consumes at least one bidder,
+// so the caller passes the bidder count) — recipes are arbitrary JSON and a
+// non-finite or huge count must not hang or exhaust memory here.
+function buildButlerCheckoutPlan(perType, typeIdsByName, maxTotal = Infinity) {
+  const plan = [];
+  const warnings = [];
+  let requestedTotal = 0;
+  Object.entries(perType || {}).forEach(([name, count]) => {
+    const match = typeIdsByName.get(String(name).toLowerCase());
+    if (!match) {
+      warnings.push({ section: 'butlerCheckouts', name, message: `custom payment type "${name}" not found on the event` });
+      return;
+    }
+    const n = Math.max(0, Math.floor(Number(count) || 0));
+    if (!Number.isFinite(n)) {
+      warnings.push({ section: 'butlerCheckouts', name, message: `${JSON.stringify(count)} is not a usable count` });
+      return;
+    }
+    requestedTotal += n;
+    for (let i = 0; i < n && plan.length < maxTotal; i += 1) plan.push({ typeName: match.name, typeId: match.id });
+  });
+  if (requestedTotal > plan.length) {
+    warnings.push({
+      section: 'butlerCheckouts',
+      message: `requested ${requestedTotal} checkouts exceed the ${plan.length} available bidders; capped`,
+    });
+  }
+  return { plan, warnings };
+}
+
+// Builds the urlencoded fields for POST /ajax/butler/checkout.php exactly like
+// ClickBid's butler checkout.js: rows are a JSON string (max_input_vars dodge),
+// payTypeId=99 is "Other" (skips payment processing), checkOutMethodId=4 is
+// the Butler channel. The server enforces sum(rows subTotal+taxAmount) ==
+// its own recomputed total == totalAmount, so totals derive from the rows.
+function buildButlerCheckoutPostData({ csrfToken, bidderId, scraped, customPaymentTypeId }) {
+  const round2 = (n) => Math.round(n * 100) / 100;
+  const taxAmount = scraped.rows.reduce((sum, row) => sum + (Number(row.taxAmount) || 0), 0);
+  const totalAmount = scraped.rows.reduce(
+    (sum, row) => sum + (Number(row.subTotal) || 0) + (Number(row.taxAmount) || 0),
+    0,
+  );
+  return {
+    action: 'checkout',
+    csrf: csrfToken,
+    bidderId: String(bidderId),
+    fmvAmount: String(scraped.fmvAmount ?? 0),
+    bidAmount: String(scraped.bidAmount ?? 0),
+    donationAmount: String(scraped.donationAmount ?? 0),
+    taxAmount: String(round2(taxAmount)),
+    totalAmount: String(round2(totalAmount)),
+    payTypeId: '99',
+    checkOutMethodId: '4',
+    checkNumber: '',
+    firstName: scraped.firstName || '',
+    lastName: scraped.lastName || '',
+    address: scraped.address || '',
+    address2: scraped.address2 || '',
+    city: scraped.city || '',
+    state: scraped.state || '',
+    zip: scraped.zip || '',
+    rows: JSON.stringify(scraped.rows),
+    ...(customPaymentTypeId ? { customPaymentTypeId: String(customPaymentTypeId) } : {}),
+  };
+}
+
+// Reads {id, name} for every custom payment type from the server-rendered
+// auction-settings rows (ClickBid has no GET/list route for these).
+async function readCustomPaymentTypeIds(page, baseUrl) {
+  await page.goto(`${baseUrl}/admin/auction_settings.php?expand=payments`, { waitUntil: 'domcontentloaded' });
+  const rows = await page.evaluate(() => (
+    Array.from(document.querySelectorAll('.custom-payment-type-row'))
+      .map((row) => ({
+        id: row.dataset.id || '',
+        name: row.querySelector('input[name="custom-payment-type"]')?.value?.trim() || '',
+      }))
+      .filter((row) => row.id && row.name)
+  ));
+  return new Map(rows.map((row) => [row.name.toLowerCase(), row]));
+}
+
+// Light JSON probe: does this bidder have unpaid winning bids right now?
+async function fetchButlerBidderSummary(page, baseUrl, csrfToken, bidderId) {
+  const result = await postAdminForm(page, `${baseUrl}/ajax/butler/event-utilities.php`, {
+    action: 'get-bidder-by-id',
+    csrf: csrfToken,
+    bidder_id: String(bidderId),
+  });
+  const bidder = result.body?.bidder;
+  const winning = bidder?.winning || {};
+  return {
+    hasWinning: ((winning.before_closing?.length || 0) + (winning.after_closing?.length || 0)) > 0,
+    queued: Boolean(bidder?.checkout_queue_exists),
+  };
+}
+
+// POSTs the butler checkout PAGE for a bidder and scrapes the server-rendered
+// row checkboxes + totals + bidder fields — the same data ClickBid's own JS
+// posts, which guarantees the server's three-way total check passes.
+async function scrapeButlerCheckoutPage(page, baseUrl, csrfToken, bidderId) {
+  await page.evaluate(({ url, csrf, bidder }) => {
+    window.__mkeventNavPending = true;
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = url;
+    const add = (name, value) => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = name;
+      input.value = value;
+      form.appendChild(input);
+    };
+    add('csrf', csrf);
+    add('bidder-id', bidder);
+    add('loc', 'butler');
+    document.body.appendChild(form);
+    form.submit();
+  }, { url: `${baseUrl}/butler/checkout.php`, csrf: csrfToken, bidder: String(bidderId) });
+  // The marker dies with the old document, so this resolves after navigation.
+  await page.waitForFunction(() => !window.__mkeventNavPending, { timeout: 20000 });
+  await page.waitForLoadState('domcontentloaded');
+
+  return page.evaluate(() => {
+    const rows = [];
+    document.querySelectorAll('.item-row:checked').forEach((checkbox) => {
+      if (checkbox.id === 'credit-card-fees') return; // card fees never apply to payTypeId=99
+      rows.push({
+        itemId: checkbox.dataset.itemId || 0,
+        bidId: checkbox.dataset.bidId || 0,
+        taxable: checkbox.dataset.taxable || 0,
+        taxRate: checkbox.dataset.taxRate || 0,
+        taxAmount: parseFloat(checkbox.dataset.taxAmount || 0),
+        typeId: parseInt(checkbox.dataset.typeId || 0, 10),
+        fmv: checkbox.dataset.fmv || 0,
+        quantityCount: checkbox.dataset.quantityCount || 0,
+        quantityPurchased: checkbox.dataset.quantityPurchased || 0,
+        subTotal: parseFloat(checkbox.dataset.subTotal || 0),
+      });
+    });
+    const val = (sel) => document.querySelector(sel)?.value ?? '';
+    return {
+      rows,
+      queued: Boolean(document.querySelector('#checkout-message')),
+      firstName: val('input[name="first-name"]').trim(),
+      lastName: val('input[name="last-name"]').trim(),
+      address: val('input[name="address"]').trim(),
+      address2: val('input[name="address2"]').trim(),
+      city: val('input[name="city"]').trim(),
+      state: val('input[name="state"]').trim(),
+      zip: val('input[name="zip"]').trim(),
+      fmvAmount: parseFloat(val('input[name="fmv-amount"]') || 0) || 0,
+      bidAmount: parseFloat(val('input[name="bid-amount"]') || 0) || 0,
+      donationAmount: parseFloat(val('input[name="donation-amount"]') || 0) || 0,
+    };
+  });
+}
+
+async function applyButlerCheckouts(page, baseUrl, butlerCheckouts, bidders, applied, skipped, warnings) {
+  const requested = butlerCheckouts || {};
+  const perTypeEntries = Object.entries(requested.perType || {}).filter(([, count]) => Number(count) > 0);
+  if (!perTypeEntries.length) {
+    skipped.push({ section: 'butlerCheckouts', reason: 'no checkout counts configured' });
+    return;
+  }
+
+  // Admin page first, then butler pages — one navigation each.
+  let typeIds;
+  let csrfToken;
+  try {
+    typeIds = await readCustomPaymentTypeIds(page, baseUrl);
+    csrfToken = await fetchCsrfTokenFromButler(page, { baseUrl });
+  } catch (error) {
+    warnings.push({ section: 'butlerCheckouts', message: `setup failed: ${error.message}` });
+    skipped.push({ section: 'butlerCheckouts', reason: 'setup failed (see warnings)' });
+    return;
+  }
+
+  const { plan, warnings: planWarnings } = buildButlerCheckoutPlan(requested.perType, typeIds, bidders.length);
+  warnings.push(...planWarnings);
+  if (!plan.length) {
+    skipped.push({ section: 'butlerCheckouts', reason: 'no matching custom payment types on the event' });
+    return;
+  }
+
+  const queue = [...bidders];
+  for (const entry of plan) {
+    let done = false;
+    while (queue.length && !done) {
+      const bidder = queue.shift();
+      try {
+        const summary = await fetchButlerBidderSummary(page, baseUrl, csrfToken, bidder.id);
+        if (!summary.hasWinning || summary.queued) continue;
+
+        const scraped = await scrapeButlerCheckoutPage(page, baseUrl, csrfToken, bidder.id);
+        if (scraped.queued || !scraped.rows.length) continue;
+
+        const postData = buildButlerCheckoutPostData({
+          csrfToken,
+          bidderId: bidder.id,
+          scraped,
+          customPaymentTypeId: entry.typeId,
+        });
+        const result = await postAdminForm(page, `${baseUrl}/ajax/butler/checkout.php`, postData, { 'X-CSRF-TOKEN': csrfToken });
+        if (result.status < 400 && result.body?.success) {
+          applied.push({
+            section: 'butlerCheckouts',
+            bidder: buildBidderDisplayName(bidder),
+            paymentType: entry.typeName,
+            total: postData.totalAmount,
+          });
+          done = true;
+        } else {
+          warnings.push({
+            section: 'butlerCheckouts',
+            bidder: buildBidderDisplayName(bidder),
+            paymentType: entry.typeName,
+            message: result.body?.message || `HTTP ${result.status}`,
+          });
+        }
+      } catch (error) {
+        warnings.push({
+          section: 'butlerCheckouts',
+          bidder: buildBidderDisplayName(bidder),
+          paymentType: entry.typeName,
+          message: error.message,
+        });
+      }
+    }
+    if (!done) {
+      warnings.push({
+        section: 'butlerCheckouts',
+        paymentType: entry.typeName,
+        message: 'no remaining bidders with unpaid winning bids',
+      });
+    }
+  }
 }
 
 function resolveTicketPurchasePaymentSupport(pageConfig) {
@@ -2429,6 +2717,16 @@ async function applyPostCreateActivity(page, baseUrl, eventSlug, postCreateActiv
         process.stderr.write(`[fallback] Donation activity completed in ${elapsedSeconds(donationStartedAt)}s\n`);
       }
     }
+
+    if (normalized.butlerCheckouts?.enabled) {
+      if (eligibleBidders.length === 0) {
+        skipped.push({ section: 'butlerCheckouts', reason: 'no seeded bidders to check out' });
+      } else {
+        const butlerStartedAt = Date.now();
+        await applyButlerCheckouts(page, baseUrl, normalized.butlerCheckouts, eligibleBidders, applied, skipped, warnings);
+        process.stderr.write(`[fallback] Butler checkout activity completed in ${elapsedSeconds(butlerStartedAt)}s\n`);
+      }
+    }
   } finally {
     await bidderSessions?.closeAll();
   }
@@ -2924,7 +3222,7 @@ async function createEventViaAdmin(payload) {
 
     let auctionSettingsResult = null;
     if (payload.auctionSettings && payload.auctionSettings.enabled !== false) {
-      auctionSettingsResult = await applyAuctionSettings(page, payload.baseUrl, eventId, payload.auctionSettings);
+      auctionSettingsResult = await applyAuctionSettings(page, payload.baseUrl, eventId, eventSlug, payload.auctionSettings);
     }
 
     let ticketPagesResult = null;
@@ -3026,6 +3324,12 @@ module.exports = {
   buildTicketPurchaseRequestData,
   buildTicketPurchaseSeedData,
   buildTicketPurchaseExecutionPlan,
+  buildButlerCheckoutPlan,
+  buildButlerCheckoutPostData,
+  applyButlerCheckouts,
+  readCustomPaymentTypeIds,
+  fetchButlerBidderSummary,
+  scrapeButlerCheckoutPage,
   buildTicketPageItemAttachmentPlans,
   createBidderSessionCache,
   createTemporaryCheckoutPage,
@@ -3034,6 +3338,7 @@ module.exports = {
   filterPostCreateAuctionItems,
   filterPostCreateDonationItems,
   resolveTicketPurchasePaymentSupport,
+  seedCustomPaymentTypes,
   navigateTicketPurchaseSection,
   shouldUseBrowserCheckout,
   assignDonationFlags,

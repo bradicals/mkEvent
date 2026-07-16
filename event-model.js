@@ -240,6 +240,7 @@
       adminFeeDescription: '',
       enableCrypto: false,
       enableLink: false,
+      customPaymentTypes: ['Venmo', 'Zelle', 'Gift Card'],
     },
     ticketPages: {
       enabled: false,
@@ -323,6 +324,10 @@
         amountMin: 25,
         amountMax: 250,
         anonymousRate: 25,
+      },
+      butlerCheckouts: {
+        enabled: false,
+        perType: {},
       },
     },
   });
@@ -456,6 +461,7 @@
       adminFeeDescription: String(base.adminFeeDescription ?? ''),
       enableCrypto: Boolean(base.enableCrypto),
       enableLink: Boolean(base.enableLink),
+      customPaymentTypes: normalizeCustomPaymentTypes(base.customPaymentTypes),
     };
   }
 
@@ -496,6 +502,30 @@
     return rawAnswers
       .map((answer) => clampString(answer, 80).trim())
       .filter(Boolean);
+  }
+
+  // Ticket 7720: per-event custom "Other" payment types. ClickBid validates
+  // name min:3/max:100, so mirror that here to keep seeding from 422ing.
+  function normalizeCustomPaymentTypes(value) {
+    if (value === undefined || value === null) {
+      return [...DEFAULT_CONFIG.auctionSettings.customPaymentTypes];
+    }
+    const raw = Array.isArray(value)
+      ? value
+      : typeof value === 'string'
+        ? value.split(',')
+        : [];
+    const seen = new Set();
+    const result = [];
+    raw.forEach((name) => {
+      const clean = clampString(name, 100).trim();
+      if (clean.length < 3) return;
+      const key = clean.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      result.push(clean);
+    });
+    return result;
   }
 
   function normalizeCustomQuestions(records) {
@@ -663,6 +693,20 @@
     };
   }
 
+  // Butler checkouts of winning bids using custom "Other" payment types.
+  // perType maps a custom type name -> number of bidder-checkouts using it.
+  // Unknown-on-event names are warned about at runtime, not dropped here.
+  function normalizeButlerCheckouts(section) {
+    const base = section || {};
+    const perType = {};
+    Object.entries(base.perType || {}).forEach(([name, count]) => {
+      const clean = clampString(name, 100).trim();
+      const n = Math.floor(Number(count) || 0);
+      if (clean.length >= 3 && Number.isFinite(n) && n > 0) perType[clean] = n;
+    });
+    return { enabled: Boolean(base.enabled), perType };
+  }
+
   function normalizeTicketPurchasePaymentMix(purchaseBase, defaults) {
     const rawMix = purchaseBase?.paymentMix || {};
     const hasExplicitMix = Object.keys(rawMix).length > 0;
@@ -786,6 +830,7 @@
       },
       auctionActivity: normalizeAuctionActivity(base.auctionActivity),
       donationActivity: normalizeDonationActivity(base.donationActivity),
+      butlerCheckouts: normalizeButlerCheckouts(base.butlerCheckouts),
     };
   }
 
@@ -1826,6 +1871,7 @@
     importPresetConfig,
     importRecipeConfig,
     normalizeAuctionSettings,
+    normalizeCustomPaymentTypes,
     normalizeItemSection,
     normalizePostCreateActivity,
     normalizeTicketPages,
