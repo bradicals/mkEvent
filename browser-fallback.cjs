@@ -1481,9 +1481,13 @@ function buildTicketPurchaseExecutionPlan(ticketPurchases) {
   return plan;
 }
 
-function buildButlerCheckoutPlan(perType, typeIdsByName) {
+// maxTotal bounds plan expansion (each checkout consumes at least one bidder,
+// so the caller passes the bidder count) — recipes are arbitrary JSON and a
+// non-finite or huge count must not hang or exhaust memory here.
+function buildButlerCheckoutPlan(perType, typeIdsByName, maxTotal = Infinity) {
   const plan = [];
   const warnings = [];
+  let requestedTotal = 0;
   Object.entries(perType || {}).forEach(([name, count]) => {
     const match = typeIdsByName.get(String(name).toLowerCase());
     if (!match) {
@@ -1491,8 +1495,19 @@ function buildButlerCheckoutPlan(perType, typeIdsByName) {
       return;
     }
     const n = Math.max(0, Math.floor(Number(count) || 0));
-    for (let i = 0; i < n; i += 1) plan.push({ typeName: match.name, typeId: match.id });
+    if (!Number.isFinite(n)) {
+      warnings.push({ section: 'butlerCheckouts', name, message: `${JSON.stringify(count)} is not a usable count` });
+      return;
+    }
+    requestedTotal += n;
+    for (let i = 0; i < n && plan.length < maxTotal; i += 1) plan.push({ typeName: match.name, typeId: match.id });
   });
+  if (requestedTotal > plan.length) {
+    warnings.push({
+      section: 'butlerCheckouts',
+      message: `requested ${requestedTotal} checkouts exceed the ${plan.length} available bidders; capped`,
+    });
+  }
   return { plan, warnings };
 }
 
@@ -1643,7 +1658,7 @@ async function applyButlerCheckouts(page, baseUrl, butlerCheckouts, bidders, app
     return;
   }
 
-  const { plan, warnings: planWarnings } = buildButlerCheckoutPlan(requested.perType, typeIds);
+  const { plan, warnings: planWarnings } = buildButlerCheckoutPlan(requested.perType, typeIds, bidders.length);
   warnings.push(...planWarnings);
   if (!plan.length) {
     skipped.push({ section: 'butlerCheckouts', reason: 'no matching custom payment types on the event' });

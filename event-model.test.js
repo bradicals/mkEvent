@@ -1367,3 +1367,13 @@ test('butler checkouts: default off, counts coerced, short names and zero counts
   }, model.DEFAULT_CONFIG.ticketPages);
   assert.deepEqual(normalized.butlerCheckouts, { enabled: true, perType: { Venmo: 2 } });
 });
+
+test('butler checkouts: non-finite counts are dropped (imported recipes can carry anything)', () => {
+  const normalized = model.normalizePostCreateActivity({
+    butlerCheckouts: {
+      enabled: true,
+      perType: { Venmo: 'Infinity', Zelle: Infinity, 'Gift Card': NaN, Check: 1 },
+    },
+  }, model.DEFAULT_CONFIG.ticketPages);
+  assert.deepEqual(normalized.butlerCheckouts, { enabled: true, perType: { Check: 1 } });
+});

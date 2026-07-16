@@ -702,7 +702,7 @@
     Object.entries(base.perType || {}).forEach(([name, count]) => {
       const clean = clampString(name, 100).trim();
       const n = Math.floor(Number(count) || 0);
-      if (clean.length >= 3 && n > 0) perType[clean] = n;
+      if (clean.length >= 3 && Number.isFinite(n) && n > 0) perType[clean] = n;
     });
     return { enabled: Boolean(base.enabled), perType };
   }

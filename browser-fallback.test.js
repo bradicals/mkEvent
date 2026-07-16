@@ -702,6 +702,22 @@ test('buildButlerCheckoutPlan expands per-type counts and warns on unknown types
   assert.match(warnings[0].message, /Missing/);
 });
 
+test('buildButlerCheckoutPlan rejects non-finite counts and caps expansion at maxTotal', () => {
+  const typeIds = new Map([
+    ['venmo', { id: '281', name: 'Venmo' }],
+    ['zelle', { id: '282', name: 'Zelle' }],
+  ]);
+
+  const infinite = fallback.buildButlerCheckoutPlan({ Venmo: Infinity, Zelle: 'Infinity' }, typeIds, 10);
+  assert.deepEqual(infinite.plan, []);
+  assert.equal(infinite.warnings.length, 2);
+  assert.match(infinite.warnings[0].message, /not a usable count/);
+
+  const oversized = fallback.buildButlerCheckoutPlan({ Venmo: 1e9, Zelle: 2 }, typeIds, 5);
+  assert.equal(oversized.plan.length, 5);
+  assert.ok(oversized.warnings.some((w) => /capped/.test(w.message)));
+});
+
 test('buildButlerCheckoutPostData computes totals from rows and JSON-stringifies them', () => {
   const scraped = {
     rows: [
