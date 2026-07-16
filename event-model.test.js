@@ -86,15 +86,12 @@ test('importRecipeConfig updates stale imported dates to visible safe values', (
 });
 
 test('preset export/import reuses recipe structure but preserves current event identity fields', () => {
-  // normalizeEventSchedule clamps dates to >= today, so hardcoded dates rot
-  // once they pass — derive future dates relative to the current day instead.
-  const futureDateOnly = (offsetDays) => {
-    const d = new Date();
-    d.setDate(d.getDate() + offsetDays);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  };
-  const currentStartDate = futureDateOnly(10);
-  const currentEndDate = futureDateOnly(11);
+  // Relative dates: importPresetConfig clamps the preserved schedule to today
+  // (normalizeEventSchedule), so hardcoded dates break once the calendar
+  // passes them.
+  const daysOut = (days) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
+  const currentStart = daysOut(30);
+  const currentEnd = daysOut(31);
   const base = {
     ...model.DEFAULT_CONFIG,
     api: {
@@ -105,11 +102,11 @@ test('preset export/import reuses recipe structure but preserves current event i
       ...model.DEFAULT_CONFIG.basics,
       name: 'Current Event Name',
       slug: 'currenteventname',
-      startDate: currentStartDate,
+      startDate: currentStart,
       startTime: '09:00',
-      endDate: currentEndDate,
+      endDate: currentEnd,
       endTime: '17:00',
-      onCallDate: currentEndDate,
+      onCallDate: currentEnd,
     },
     bidders: {
       ...model.DEFAULT_CONFIG.bidders,
@@ -127,9 +124,9 @@ test('preset export/import reuses recipe structure but preserves current event i
       ...base.basics,
       name: 'Preset Event Name',
       slug: 'preseteventname',
-      startDate: futureDateOnly(40),
-      endDate: futureDateOnly(41),
-      onCallDate: futureDateOnly(41),
+      startDate: daysOut(60),
+      endDate: daysOut(61),
+      onCallDate: daysOut(61),
     },
     bidders: {
       ...base.bidders,
@@ -149,7 +146,7 @@ test('preset export/import reuses recipe structure but preserves current event i
   const imported = model.importPresetConfig(base, preset);
   assert.equal(imported.basics.name, 'Current Event Name');
   assert.equal(imported.basics.slug, 'currenteventname');
-  assert.equal(imported.basics.startDate, currentStartDate);
+  assert.equal(imported.basics.startDate, currentStart);
   assert.equal(imported.items.bulk.silentCount, 3);
   assert.equal(imported.items.bulk.liveCount, 2);
   assert.equal(imported.bidders.bulk.count, 7);
@@ -628,7 +625,6 @@ test('exportRecipeConfig excludes tokens and importRecipeConfig preserves local 
       env: 'dev2',
       organizationId: '2716',
       orgToken: 'secret-org-token',
-      eventToken: 'secret-event-token',
       browser: 'firefox',
       adminEmail: 'admin@example.test',
       adminPassword: 'secret-browser-password',
@@ -652,7 +648,6 @@ test('exportRecipeConfig excludes tokens and importRecipeConfig preserves local 
   assert.equal(exported.bidders.bulk.count, 7);
   assert.equal(exported.bidders.exact.records.length, 1);
   assert.equal(JSON.stringify(exported).includes('secret-org-token'), false);
-  assert.equal(JSON.stringify(exported).includes('secret-event-token'), false);
 
   const imported = model.importRecipeConfig(current, {
     environment: { id: 'dev4', baseUrl: 'https://malicious.example' },
@@ -672,7 +667,6 @@ test('exportRecipeConfig excludes tokens and importRecipeConfig preserves local 
   assert.equal(imported.api.env, 'dev4');
   assert.equal(imported.api.baseUrl, 'https://cbodev4.com');
   assert.equal(imported.api.orgToken, 'secret-org-token');
-  assert.equal(imported.api.eventToken, 'secret-event-token');
   assert.equal(imported.api.browser, 'firefox');
   assert.equal(imported.api.adminEmail, 'admin@example.test');
   assert.equal(imported.api.adminPassword, 'secret-browser-password');
@@ -707,7 +701,6 @@ test('local settings persistence stores credentials separately from recipes', ()
       env: 'dev3',
       organizationId: 'local-org',
       orgToken: 'secret-org-token',
-      eventToken: 'secret-event-token',
       browser: 'webkit',
       adminEmail: 'admin@example.test',
       adminPassword: 'secret-browser-password',
@@ -727,7 +720,6 @@ test('local settings persistence stores credentials separately from recipes', ()
   assert.equal(saved.profiles['dev3::local-org'].env, 'dev3');
   assert.equal(saved.profiles['dev3::local-org'].organizationId, 'local-org');
   assert.equal(saved.profiles['dev3::local-org'].orgToken, 'secret-org-token');
-  assert.equal(saved.profiles['dev3::local-org'].eventToken, 'secret-event-token');
   assert.equal(saved.profiles['dev3::local-org'].label, 'Dev 3 Local Org');
   assert.equal(saved.selectedProfileByEnv.dev3, 'dev3::local-org');
   assert.equal(JSON.stringify(saved).includes('Should Not Persist'), false);
@@ -745,7 +737,6 @@ test('local settings persistence stores credentials separately from recipes', ()
   assert.equal(restored.api.apiBaseUrl, 'https://cbodev3.com/api/v4');
   assert.equal(restored.api.organizationId, 'local-org');
   assert.equal(restored.api.orgToken, 'secret-org-token');
-  assert.equal(restored.api.eventToken, 'secret-event-token');
   assert.equal(restored.api.browser, 'webkit');
   assert.equal(restored.api.adminEmail, 'admin@example.test');
   assert.equal(restored.api.adminPassword, 'secret-browser-password');
@@ -761,7 +752,6 @@ test('legacy local settings migrate into an env-specific org profile', () => {
       env: 'dev2',
       organizationId: '2159',
       orgToken: 'legacy-token',
-      eventToken: 'legacy-event-token',
       browser: 'firefox',
       adminEmail: 'admin@example.test',
       adminPassword: 'secret-browser-password',
@@ -788,7 +778,6 @@ test('saveApiProfile, applyApiProfile, and deleteApiProfile manage env-scoped or
       ...model.environmentPatch('stage'),
       organizationId: '2159',
       orgToken: 'stage-token',
-      eventToken: 'stage-event-token',
       profileLabel: 'Main Stage Org',
     },
   };
@@ -804,7 +793,6 @@ test('saveApiProfile, applyApiProfile, and deleteApiProfile manage env-scoped or
       ...model.environmentPatch('dev2'),
       organizationId: '9999',
       orgToken: 'dev2-token',
-      eventToken: 'dev2-event-token',
       profileLabel: 'Dev2 Org',
     },
   };
@@ -1286,6 +1274,35 @@ test('httpCreateEvent posts to the http create endpoint', async () => {
   } finally {
     global.fetch = originalFetch;
   }
+});
+
+test('httpCreateEvent re-attaches eventLikelyCreated from the error envelope', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = async () => ({
+    ok: false,
+    status: 502,
+    json: async () => ({ ok: false, error: 'http_admin_error', message: 'created but no id read back', eventLikelyCreated: true }),
+  });
+
+  try {
+    await assert.rejects(
+      model.httpCreateEvent('http://localhost:9999/proxy', { event: { slug: 'qa-http' } }),
+      (err) => err.eventLikelyCreated === true && /created but no id/.test(err.message),
+    );
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('normalizeTicketPages is idempotent for page-level custom questions', () => {
+  const once = model.normalizeTicketPages({
+    enabled: true,
+    pages: [{ formName: 'tix', customQuestions: [{ question: 'Dietary needs', type: 'text' }] }],
+  });
+  assert.equal(once.pages[0].pageCustomQuestions.length, 1);
+  const twice = model.normalizeTicketPages(once);
+  assert.equal(twice.pages[0].pageCustomQuestions.length, 1);
+  assert.equal(twice.pages[0].pageCustomQuestions[0].question, 'Dietary needs');
 });
 
 test('httpApplyPostItemConfig posts to the http post-item-config endpoint', async () => {

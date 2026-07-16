@@ -39,6 +39,20 @@ function legacySettingsKey(env) {
 const SECURE = window.mkEventDesktop?.secureSettings;
 const SECURE_ON = Boolean(SECURE?.isAvailable?.());
 
+// When the encrypted store exists but couldn't be decrypted (transient DPAPI
+// hiccup), block all saves for this session — otherwise the auto-save effect
+// would overwrite the still-valid file with defaults (issue #15).
+let secureLoadFailed = false;
+
+function loadSecureSettings() {
+  const result = SECURE.load();
+  if (result && !result.ok) {
+    secureLoadFailed = true;
+    console.warn('mkEvent secure settings could not be decrypted; saving is disabled this session to protect the stored copy.');
+  }
+  return result?.json ?? null;
+}
+
 function readPlaintextSettings(env) {
   return window.localStorage?.getItem(settingsKey())
     || window.localStorage?.getItem(legacySettingsKey(env))
@@ -59,8 +73,8 @@ function purgePlaintextSettings() {
 function loadInitialConfig() {
   const defaults = cloneDefaultConfig();
   try {
-    let saved = SECURE_ON ? SECURE.load() : null;
-    if (!saved) {
+    let saved = SECURE_ON ? loadSecureSettings() : null;
+    if (!saved && !secureLoadFailed) {
       saved = readPlaintextSettings(defaults.api.env);
       if (saved && SECURE_ON) {
         // One-time migration: move plaintext settings into the encrypted
@@ -77,6 +91,7 @@ function loadInitialConfig() {
 
 function saveLocalSettings(cfg) {
   try {
+    if (SECURE_ON && secureLoadFailed) return;
     const json = JSON.stringify(EVENT_MODEL.exportLocalSettings(cfg));
     if (SECURE_ON) SECURE.save(json);
     else window.localStorage?.setItem(settingsKey(), json);
@@ -132,7 +147,10 @@ function useConfig() {
         },
       };
       try {
-        const saved = (SECURE_ON ? SECURE.load() : null) || readPlaintextSettings(newEnv);
+        // Same rule as loadInitialConfig: after a decrypt failure the encrypted
+        // store stays authoritative — don't fall back to plaintext.
+        const saved = (SECURE_ON ? loadSecureSettings() : null)
+          || (secureLoadFailed ? null : readPlaintextSettings(newEnv));
         if (saved) {
           return EVENT_MODEL.importLocalSettings(nextBase, JSON.parse(saved));
         }
@@ -180,7 +198,7 @@ function AppTop({ cfg, onOpenSettings }) {
       <div className="app-top-logo">
         <img src={clickbidMarkUrl} alt="ClickBid" />
         <span className="divider"></span>
-        <span className="product">mkEvent <span>· QA event creator</span></span>
+        <span className="product">mkEvent <span>· QA event creator · v{__APP_VERSION__}</span></span>
       </div>
       <div className="app-top-right">
         <button className={`api-pill ${apiConnected ? 'connected' : ''}`}>
@@ -759,7 +777,7 @@ function App() {
                     </button>
                   )}
                 </div>
-                <SettingsBody data={cfg.api} set={set('api')} onTestConnection={testConnection} testState={testState} testError={testError} onSaveProfile={saveApiProfile} onLoadProfile={loadApiProfile} onDeleteProfile={deleteApiProfile} guide={!guideDismissed && !(cfg.api.orgToken && cfg.api.selectedProfileId)} />
+                <SettingsBody data={cfg.api} set={set('api')} onSwitchEnv={switchEnv} onTestConnection={testConnection} testState={testState} testError={testError} onSaveProfile={saveApiProfile} onLoadProfile={loadApiProfile} onDeleteProfile={deleteApiProfile} guide={!guideDismissed && !(cfg.api.orgToken && cfg.api.selectedProfileId)} />
               </section>
             </div>
           </aside>

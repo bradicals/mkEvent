@@ -11,10 +11,17 @@ const STEPS = [
   { id: 'review',   num: 8, icon: 'fa-rocket', title: 'Review & create',  subtitle: 'Confirm the recipe, then build the event.' },
 ];
 
+// Shipped placeholder name/slug (event-model DEFAULT_CONFIG.basics). Quick-start
+// recipes fill dates but keep these, which used to mark the step "ready" — the
+// user must rename the event before it counts as done.
+const PLACEHOLDER_NAME = 'QA Event';
+const PLACEHOLDER_SLUG = 'qaevent';
+
 function basicsReady(cfg) {
   const b = cfg.basics || {};
   return Boolean(
-    b.name && b.slug && b.startDate && b.endDate && b.onCallDate &&
+    b.name && b.slug && b.name !== PLACEHOLDER_NAME && b.slug !== PLACEHOLDER_SLUG &&
+    b.startDate && b.endDate && b.onCallDate &&
     b.contactFirstName && b.contactLastName && b.contactEmail && b.contactPhone
   );
 }

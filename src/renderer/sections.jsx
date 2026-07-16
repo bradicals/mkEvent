@@ -1,44 +1,10 @@
-// Sections - reusable section card plus QA-focused settings bodies.
+// Sections - QA-focused settings bodies rendered inside the wizard's step cards.
 
 import React, { useEffect, useRef, useState } from 'react';
 import MODEL from '../shared/event-model.js';
 
 // Checked once at load — sendSync IPC, so don't call it per render.
 const SECURE_STORAGE_ON = Boolean(window.mkEventDesktop?.secureSettings?.isAvailable?.());
-
-export function Section({ icon, title, sub, summary, defaultOpen = false, children }) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <section className={`section ${open ? 'is-open' : ''}`}>
-      <header
-        className="section-head"
-        role="button"
-        tabIndex={0}
-        aria-expanded={open}
-        onClick={() => setOpen(o => !o)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            setOpen(o => !o);
-          }
-        }}
-      >
-        <div className="section-icon"><i className={`fa-solid ${icon}`}></i></div>
-        <div className="section-titles">
-          <h3 className="section-title">{title}</h3>
-          {sub && <p className="section-sub">{sub}</p>}
-        </div>
-        <div className="section-meta">{summary}</div>
-        <i className="fa-solid fa-chevron-down section-chev"></i>
-      </header>
-      {open && (
-        <div className="section-body">
-          <div className="section-body-inner">{children}</div>
-        </div>
-      )}
-    </section>
-  );
-}
 
 export function Switch({ on, onClick }) {
   return <div className={`switch ${on ? 'on' : ''}`} onClick={onClick} role="switch" aria-checked={on}></div>;
@@ -1466,12 +1432,15 @@ export function PostCreateActivityBody({ data, ticketPages, auctionSettings, set
   );
 }
 
-export function SettingsBody({ data, set, onTestConnection, testState, testError, onSaveProfile, onLoadProfile, onDeleteProfile, guide = false }) {
+export function SettingsBody({ data, set, onSwitchEnv, onTestConnection, testState, testError, onSaveProfile, onLoadProfile, onDeleteProfile, guide = false }) {
   const [showOrg, setShowOrg] = useState(false);
-  const [showEvent, setShowEvent] = useState(false);
   // First-run guided checklist: steps check off from live state; the current
   // step's control gets a pulse highlight and is scrolled into view.
+  // Env has a default (stage), so "done" can't come from the value alone —
+  // it checks off once the user touches the select or has moved on to creds.
+  const [envConfirmed, setEnvConfirmed] = useState(false);
   const guideSteps = guide ? [
+    { key: 'env', label: 'Pick the environment you are targeting', done: envConfirmed || Boolean(data.organizationId || data.orgToken) },
     { key: 'org', label: 'Enter your Organization ID', done: Boolean(data.organizationId) },
     { key: 'token', label: 'Paste your Organization API token', done: Boolean(data.orgToken) },
     // Optional: also checks off once the user moves on (test/save) so empty
@@ -1510,6 +1479,20 @@ export function SettingsBody({ data, set, onTestConnection, testState, testError
           </div>
         </div>
       )}
+      <div className={`field span-2 ${guideStep === 'env' ? 'is-guided' : ''}`} ref={el => { guideRefs.current.env = el; }}>
+        <label>Environment <span className="req">*</span></label>
+        {guideStep === 'env' && <div className="coach-inline"><i className="fa-solid fa-arrow-down" /> Your token only works on the environment it was issued for</div>}
+        <select
+          value={data.env}
+          onFocus={() => setEnvConfirmed(true)}
+          onChange={e => { setEnvConfirmed(true); onSwitchEnv?.(e.target.value); }}
+        >
+          {Object.entries(MODEL.ENVIRONMENTS).map(([value, preset]) => (
+            <option key={value} value={value}>{preset.label}</option>
+          ))}
+        </select>
+        <div className="help">Profiles, tokens, and the connection test are all scoped to this environment. Pick it first.</div>
+      </div>
       <div className="field span-2">
         <label>Environment base URL</label>
         <input type="text" value={currentBaseUrl} readOnly />
@@ -1551,7 +1534,7 @@ export function SettingsBody({ data, set, onTestConnection, testState, testError
             </option>
           ))}
         </select>
-        <div className="help">Profiles are scoped to the selected environment and save org/event bearer tokens only.</div>
+        <div className="help">Profiles are scoped to the selected environment and save the org bearer token only.</div>
       </div>
       <div className="field">
         <label>Profile label</label>
@@ -1574,15 +1557,6 @@ export function SettingsBody({ data, set, onTestConnection, testState, testError
           <input type={showOrg ? 'text' : 'password'} value={data.orgToken} onChange={e => set({ orgToken: e.target.value })} placeholder="Organization-scoped token" />
           <button onClick={() => setShowOrg(s => !s)} style={{ position: 'absolute', right: 8, top: 6, background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b', padding: 6 }}>
             <i className={`fa-regular ${showOrg ? 'fa-eye-slash' : 'fa-eye'}`}></i>
-          </button>
-        </div>
-      </div>
-      <div className="field">
-        <label>Event bearer token</label>
-        <div style={{ position: 'relative' }}>
-          <input type={showEvent ? 'text' : 'password'} value={data.eventToken} onChange={e => set({ eventToken: e.target.value })} placeholder="Optional after event creation" />
-          <button onClick={() => setShowEvent(s => !s)} style={{ position: 'absolute', right: 8, top: 6, background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b', padding: 6 }}>
-            <i className={`fa-regular ${showEvent ? 'fa-eye-slash' : 'fa-eye'}`}></i>
           </button>
         </div>
       </div>
@@ -1631,7 +1605,7 @@ export function SettingsBody({ data, set, onTestConnection, testState, testError
       <div className="field span-full">
         <div className="callout">
           <i className="fa-solid fa-key"></i>
-          <div>Org and event bearer tokens are saved as environment-specific org profiles on this workstation. Admin fallback credentials, proxy URL, and browser choice are global to the workstation. Exported event recipes do not include tokens. URLs are locked to trusted QA environment presets.</div>
+          <div>Org bearer tokens are saved as environment-specific org profiles on this workstation. Admin fallback credentials, proxy URL, and browser choice are global to the workstation. Exported event recipes do not include tokens. URLs are locked to trusted QA environment presets.</div>
         </div>
       </div>
     </div>
