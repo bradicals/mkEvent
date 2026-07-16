@@ -6,7 +6,8 @@ ClickBid ticket: 7720 (FEAT: /admin/auction_settings: Payments: "Other" payment 
 
 Two features, one branch (approved by Brad):
 
-1. mkEvent setting to seed an event's custom "Other" payment types (add/remove list).
+1. mkEvent setting to seed an event's custom "Other" payment types (add/remove list),
+   plus post-create butler checkouts of winning bids using those types (per-type counts).
 2. Remove the default Electron menu bar / window frame; add custom minimize / maximize / close buttons.
 
 ---
@@ -75,27 +76,96 @@ New field directly after "Enable Link?" (sections.jsx:591-620):
   If it turns out to be the org slug, the helper swaps in that value — no other
   design change.
 
+### Post-create activity — butler winning-bid checkouts
+
+New post-create activity: check out winning bidders through butler using the
+custom "Other" payment types, so Paid Checkouts / statements / reports have data
+to show. Captured contract (from a real triage checkout):
+
+```
+POST {base}/ajax/butler/checkout.php        (urlencoded, X-Requested-With: XMLHttpRequest)
+action=checkout & csrf={butler csrf} & bidderId=...
+& fmvAmount & bidAmount & donationAmount=0 & taxAmount & totalAmount
+& payTypeId=99 & checkOutMethodId=4 & checkNumber=
+& firstName & lastName & address/address2/city/state/zip (blank ok)
+& rows=[{itemId, bidId, taxable, taxRate, taxAmount, typeId, fmv,
+         quantityCount, quantityPurchased, subTotal}]
+& customPaymentTypeId={id of the custom type record}
+```
+
+`checkOutMethodId=4` is the "Other" method; `customPaymentTypeId` points at the
+per-event custom type record. One checkout = one bidder with **all** their
+current winning-bid rows.
+
+**Model** (`event-model.js`):
+
+- New `postCreateActivity.butlerCheckouts = { enabled: false, perType: {} }`,
+  where `perType` maps custom type name → number of bidder-checkouts using it
+  (per Brad: per-type counts, not round-robin).
+- `normalizeButlerCheckouts(section)`: `enabled` boolean; `perType` keeps string
+  keys with non-negative integer counts. Names not present in
+  `auctionSettings.customPaymentTypes` are dropped at runtime with a warning,
+  not in the normalizer (keeps it pure/section-local).
+
+**UI** (`sections.jsx` — PostCreateActivityBody):
+
+- New "Butler checkouts" block after the auction-activity controls: enable
+  toggle + one count input per custom type, rendered dynamically from
+  `cfg.auctionSettings.customPaymentTypes` (passed as a prop, same pattern as
+  AuctionSettingsBody receiving `bidders`). Empty type list → help text pointing
+  at Auction Settings.
+- Inline hint (existing warning-banner pattern) when butler checkouts are
+  enabled but auction activity is disabled or `bidCount` is 0 — no bids means no
+  winners to check out.
+
+**Engine** (`browser-fallback.cjs`, `post-create-activity` action):
+
+- Runs after auction activity. Steps:
+  1. GET `{base}/app/public/admin/{eventSlug}/custom-payment-types` to map
+     type name → id (decoupled from the create step, which runs in a separate
+     fallback process).
+  2. Discover winning bidders + their row data from butler's own data source
+     (the ajax the butler checkout page uses — to be captured on triage during
+     implementation; ClickBid is the source of truth since mkEvent's seeded
+     bids don't retain bid ids and can be outbid).
+  3. Assign distinct winner-bidders to types per the `perType` counts, build the
+     `rows` payload from butler's data, compute totals, POST `action=checkout`
+     with the existing butler CSRF helper (`fetchCsrfTokenFromButler`,
+     browser-fallback.cjs:354) via the existing `postAdminForm` pattern (:627).
+- Each checkout records into `applied`/`skipped`/`warnings`; shortfalls (fewer
+  winning bidders than requested counts) warn and check out as many as possible.
+
+**Implementation-time discovery on triage** (all isolated to step 2 above):
+
+- Response shape of `POST custom-payment-types` (id capture is via the GET
+  listing anyway).
+- The butler endpoint returning a bidder's winning-bid/checkout rows.
+- Confirm `payTypeId=99` semantics (mirrored from the capture regardless).
+
 ### Error handling
 
 - Model: silent normalization (matches every other field).
-- Engine: per-name try/catch → `warnings[]`; non-2xx response → warning with
-  status. No retries (idempotent seeding on a fresh event; a failure is visible
-  in the run summary).
+- Engine: per-name / per-checkout try/catch → `warnings[]`; non-2xx response →
+  warning with status. No retries (idempotent seeding on a fresh event; a
+  failure is visible in the run summary).
 
 ### Testing
 
 - `event-model.test.js`: normalizer cases — missing → stocked defaults, `[]`
-  stays empty, comma-string accepted, trim/clamp/dedupe.
-- `browser-fallback.test.js`: helper exported through the existing test-seam
-  block (browser-fallback.cjs:3025) and exercised with a stubbed page object.
+  stays empty, comma-string accepted, trim/clamp/dedupe; `butlerCheckouts`
+  normalization (counts coerced, negatives dropped).
+- `browser-fallback.test.js`: checkout payload builder as a pure exported
+  helper (rows → form fields + totals) through the existing test-seam block
+  (browser-fallback.cjs:3025); custom-type seeding helper exercised with a
+  stubbed page object.
 
 ### Out of scope
 
 - Wiring custom types into post-create ticket-purchase `paymentMix` (API
   purchases keep using the fixed `PAYMENT_METHOD_IDS`).
 - Removing/renaming types on an existing event (mkEvent only seeds new events).
-- Butler checkout / statements / reports surfaces from the ticket (those are
-  ClickBid's, not mkEvent's).
+- Statements / receipts / reports surfaces from the ticket (ClickBid renders
+  those; mkEvent just seeds the data they display).
 
 ---
 
