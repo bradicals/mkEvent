@@ -1532,6 +1532,170 @@ function buildButlerCheckoutPostData({ csrfToken, bidderId, scraped, customPayme
   };
 }
 
+// Reads {id, name} for every custom payment type from the server-rendered
+// auction-settings rows (ClickBid has no GET/list route for these).
+async function readCustomPaymentTypeIds(page, baseUrl) {
+  await page.goto(`${baseUrl}/admin/auction_settings.php?expand=payments`, { waitUntil: 'domcontentloaded' });
+  const rows = await page.evaluate(() => (
+    Array.from(document.querySelectorAll('.custom-payment-type-row'))
+      .map((row) => ({
+        id: row.dataset.id || '',
+        name: row.querySelector('input[name="custom-payment-type"]')?.value?.trim() || '',
+      }))
+      .filter((row) => row.id && row.name)
+  ));
+  return new Map(rows.map((row) => [row.name.toLowerCase(), row]));
+}
+
+// Light JSON probe: does this bidder have unpaid winning bids right now?
+async function fetchButlerBidderSummary(page, baseUrl, csrfToken, bidderId) {
+  const result = await postAdminForm(page, `${baseUrl}/ajax/butler/event-utilities.php`, {
+    action: 'get-bidder-by-id',
+    csrf: csrfToken,
+    bidder_id: String(bidderId),
+  });
+  const bidder = result.body?.bidder;
+  const winning = bidder?.winning || {};
+  return {
+    hasWinning: ((winning.before_closing?.length || 0) + (winning.after_closing?.length || 0)) > 0,
+    queued: Boolean(bidder?.checkout_queue_exists),
+  };
+}
+
+// POSTs the butler checkout PAGE for a bidder and scrapes the server-rendered
+// row checkboxes + totals + bidder fields — the same data ClickBid's own JS
+// posts, which guarantees the server's three-way total check passes.
+async function scrapeButlerCheckoutPage(page, baseUrl, csrfToken, bidderId) {
+  await page.evaluate(({ url, csrf, bidder }) => {
+    window.__mkeventNavPending = true;
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = url;
+    const add = (name, value) => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = name;
+      input.value = value;
+      form.appendChild(input);
+    };
+    add('csrf', csrf);
+    add('bidder-id', bidder);
+    add('loc', 'butler');
+    document.body.appendChild(form);
+    form.submit();
+  }, { url: `${baseUrl}/butler/checkout.php`, csrf: csrfToken, bidder: String(bidderId) });
+  // The marker dies with the old document, so this resolves after navigation.
+  await page.waitForFunction(() => !window.__mkeventNavPending, { timeout: 20000 });
+  await page.waitForLoadState('domcontentloaded');
+
+  return page.evaluate(() => {
+    const rows = [];
+    document.querySelectorAll('.item-row:checked').forEach((checkbox) => {
+      if (checkbox.id === 'credit-card-fees') return; // card fees never apply to payTypeId=99
+      rows.push({
+        itemId: checkbox.dataset.itemId || 0,
+        bidId: checkbox.dataset.bidId || 0,
+        taxable: checkbox.dataset.taxable || 0,
+        taxRate: checkbox.dataset.taxRate || 0,
+        taxAmount: parseFloat(checkbox.dataset.taxAmount || 0),
+        typeId: parseInt(checkbox.dataset.typeId || 0, 10),
+        fmv: checkbox.dataset.fmv || 0,
+        quantityCount: checkbox.dataset.quantityCount || 0,
+        quantityPurchased: checkbox.dataset.quantityPurchased || 0,
+        subTotal: parseFloat(checkbox.dataset.subTotal || 0),
+      });
+    });
+    const val = (sel) => document.querySelector(sel)?.value ?? '';
+    return {
+      rows,
+      queued: Boolean(document.querySelector('#checkout-message')),
+      firstName: val('input[name="first-name"]').trim(),
+      lastName: val('input[name="last-name"]').trim(),
+      address: val('input[name="address"]').trim(),
+      address2: val('input[name="address2"]').trim(),
+      city: val('input[name="city"]').trim(),
+      state: val('input[name="state"]').trim(),
+      zip: val('input[name="zip"]').trim(),
+      fmvAmount: parseFloat(val('input[name="fmv-amount"]') || 0) || 0,
+      bidAmount: parseFloat(val('input[name="bid-amount"]') || 0) || 0,
+      donationAmount: parseFloat(val('input[name="donation-amount"]') || 0) || 0,
+    };
+  });
+}
+
+async function applyButlerCheckouts(page, baseUrl, butlerCheckouts, bidders, applied, skipped, warnings) {
+  const requested = butlerCheckouts || {};
+  const perTypeEntries = Object.entries(requested.perType || {}).filter(([, count]) => Number(count) > 0);
+  if (!perTypeEntries.length) {
+    skipped.push({ section: 'butlerCheckouts', reason: 'no checkout counts configured' });
+    return;
+  }
+
+  // Admin page first, then butler pages — one navigation each.
+  const typeIds = await readCustomPaymentTypeIds(page, baseUrl);
+  const csrfToken = await fetchCsrfTokenFromButler(page, { baseUrl });
+
+  const { plan, warnings: planWarnings } = buildButlerCheckoutPlan(requested.perType, typeIds);
+  warnings.push(...planWarnings);
+  if (!plan.length) {
+    skipped.push({ section: 'butlerCheckouts', reason: 'no matching custom payment types on the event' });
+    return;
+  }
+
+  const queue = [...bidders];
+  for (const entry of plan) {
+    let done = false;
+    while (queue.length && !done) {
+      const bidder = queue.shift();
+      try {
+        const summary = await fetchButlerBidderSummary(page, baseUrl, csrfToken, bidder.id);
+        if (!summary.hasWinning || summary.queued) continue;
+
+        const scraped = await scrapeButlerCheckoutPage(page, baseUrl, csrfToken, bidder.id);
+        if (scraped.queued || !scraped.rows.length) continue;
+
+        const postData = buildButlerCheckoutPostData({
+          csrfToken,
+          bidderId: bidder.id,
+          scraped,
+          customPaymentTypeId: entry.typeId,
+        });
+        const result = await postAdminForm(page, `${baseUrl}/ajax/butler/checkout.php`, postData, { 'X-CSRF-TOKEN': csrfToken });
+        if (result.status < 400 && result.body?.success) {
+          applied.push({
+            section: 'butlerCheckouts',
+            bidder: buildBidderDisplayName(bidder),
+            paymentType: entry.typeName,
+            total: postData.totalAmount,
+          });
+          done = true;
+        } else {
+          warnings.push({
+            section: 'butlerCheckouts',
+            bidder: buildBidderDisplayName(bidder),
+            paymentType: entry.typeName,
+            message: result.body?.message || `HTTP ${result.status}`,
+          });
+        }
+      } catch (error) {
+        warnings.push({
+          section: 'butlerCheckouts',
+          bidder: buildBidderDisplayName(bidder),
+          paymentType: entry.typeName,
+          message: error.message,
+        });
+      }
+    }
+    if (!done) {
+      warnings.push({
+        section: 'butlerCheckouts',
+        paymentType: entry.typeName,
+        message: 'no remaining bidders with unpaid winning bids',
+      });
+    }
+  }
+}
+
 function resolveTicketPurchasePaymentSupport(pageConfig) {
   const settings = pageConfig?.settings || {};
   return {
@@ -2530,6 +2694,16 @@ async function applyPostCreateActivity(page, baseUrl, eventSlug, postCreateActiv
         process.stderr.write(`[fallback] Donation activity completed in ${elapsedSeconds(donationStartedAt)}s\n`);
       }
     }
+
+    if (normalized.butlerCheckouts?.enabled) {
+      if (eligibleBidders.length === 0) {
+        skipped.push({ section: 'butlerCheckouts', reason: 'no seeded bidders to check out' });
+      } else {
+        const butlerStartedAt = Date.now();
+        await applyButlerCheckouts(page, baseUrl, normalized.butlerCheckouts, eligibleBidders, applied, skipped, warnings);
+        process.stderr.write(`[fallback] Butler checkout activity completed in ${elapsedSeconds(butlerStartedAt)}s\n`);
+      }
+    }
   } finally {
     await bidderSessions?.closeAll();
   }
@@ -3129,6 +3303,10 @@ module.exports = {
   buildTicketPurchaseExecutionPlan,
   buildButlerCheckoutPlan,
   buildButlerCheckoutPostData,
+  applyButlerCheckouts,
+  readCustomPaymentTypeIds,
+  fetchButlerBidderSummary,
+  scrapeButlerCheckoutPage,
   buildTicketPageItemAttachmentPlans,
   createBidderSessionCache,
   createTemporaryCheckoutPage,
