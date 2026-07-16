@@ -1154,7 +1154,7 @@ export function TicketPagesBody({ data, items, set, basics = {}, api = {} }) {
   );
 }
 
-export function PostCreateActivityBody({ data, ticketPages, set }) {
+export function PostCreateActivityBody({ data, ticketPages, auctionSettings, set }) {
   const normalizedTicketPages = MODEL.normalizeTicketPages(ticketPages);
   const activity = MODEL.normalizePostCreateActivity(data, normalizedTicketPages);
   const purchase = activity.ticketPurchases;
@@ -1190,6 +1190,14 @@ export function PostCreateActivityBody({ data, ticketPages, set }) {
   const commitAuction = (patch) => commit({ auctionActivity: { ...auction, ...patch } });
   const commitDonations = (patch) => commit({ donationActivity: { ...donations, ...patch } });
   const commitPaymentMix = (method, value) => commitPurchase({ paymentMix: { ...(purchase.paymentMix || {}), [method]: Math.max(0, Number(value) || 0) } });
+  const butler = activity.butlerCheckouts || MODEL.DEFAULT_CONFIG.postCreateActivity.butlerCheckouts;
+  const commitButler = (patch) => commit({ butlerCheckouts: { ...butler, ...patch } });
+  const commitButlerCount = (name, value) => commitButler({
+    perType: { ...(butler.perType || {}), [name]: Math.max(0, Number(value) || 0) },
+  });
+  const customTypeNames = Array.isArray(auctionSettings?.customPaymentTypes)
+    ? auctionSettings.customPaymentTypes
+    : MODEL.DEFAULT_CONFIG.auctionSettings.customPaymentTypes;
 
   return (
     <div className="section-pane-stack">
@@ -1383,6 +1391,50 @@ export function PostCreateActivityBody({ data, ticketPages, set }) {
           <label>Max donation</label>
           <input type="number" min="1" value={donations.amountMax} disabled={!donations.enabled} onChange={e => commitDonations({ amountMax: +e.target.value })} />
         </div>
+      </div>
+
+      <div className="form-grid cols-3" style={{ opacity: activityDisabled ? 0.45 : 1, pointerEvents: activityDisabled ? 'none' : 'auto' }}>
+        <div className="field span-full">
+          <div className="callout">
+            <i className="fa-solid fa-cash-register"></i>
+            <div><strong>Butler checkouts</strong> — checks out winning bidders through butler using the event&apos;s custom “Other” payment types. Donation bids check out immediately; silent/live bids only count once their items close.</div>
+          </div>
+        </div>
+        <div className="field">
+          <label>Seed butler checkouts</label>
+          <div className="toggle-row" style={{ height: 40, padding: '8px 12px' }}>
+            <div className="sub">Check out winners with Other payment types.</div>
+            <Switch on={butler.enabled} onClick={() => commitButler({ enabled: !butler.enabled })} />
+          </div>
+        </div>
+        {butler.enabled && customTypeNames.length === 0 && (
+          <div className="field span-full">
+            <div className="callout warn">
+              <i className="fa-solid fa-triangle-exclamation"></i>
+              <div><strong>No custom payment types</strong> — add them under Auction Settings → Payments → Other payment types first.</div>
+            </div>
+          </div>
+        )}
+        {butler.enabled && !auction.enabled && !donations.enabled && (
+          <div className="field span-full">
+            <div className="callout warn">
+              <i className="fa-solid fa-triangle-exclamation"></i>
+              <div><strong>Nothing to check out</strong> — enable auction or donation activity above so bidders have unpaid winning bids.</div>
+            </div>
+          </div>
+        )}
+        {customTypeNames.map((name) => (
+          <div className="field" key={name}>
+            <label>{name} checkouts</label>
+            <input
+              type="number"
+              min="0"
+              value={butler.perType?.[name] ?? 0}
+              disabled={!butler.enabled}
+              onChange={(e) => commitButlerCount(name, e.target.value)}
+            />
+          </div>
+        ))}
       </div>
     </div>
   );

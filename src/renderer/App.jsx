@@ -638,7 +638,7 @@ function App() {
       case 'tickets':
         return <TicketPagesBody data={cfg.ticketPages} items={cfg.items} set={set('ticketPages')} basics={cfg.basics} api={cfg.api} />;
       case 'activity':
-        return <PostCreateActivityBody data={cfg.postCreateActivity} ticketPages={cfg.ticketPages} set={set('postCreateActivity')} />;
+        return <PostCreateActivityBody data={cfg.postCreateActivity} ticketPages={cfg.ticketPages} auctionSettings={cfg.auctionSettings} set={set('postCreateActivity')} />;
       case 'review':
         return <ReviewStep summary={summary} cfg={cfg} />;
       default:
