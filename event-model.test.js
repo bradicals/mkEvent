@@ -86,6 +86,15 @@ test('importRecipeConfig updates stale imported dates to visible safe values', (
 });
 
 test('preset export/import reuses recipe structure but preserves current event identity fields', () => {
+  // normalizeEventSchedule clamps dates to >= today, so hardcoded dates rot
+  // once they pass — derive future dates relative to the current day instead.
+  const futureDateOnly = (offsetDays) => {
+    const d = new Date();
+    d.setDate(d.getDate() + offsetDays);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const currentStartDate = futureDateOnly(10);
+  const currentEndDate = futureDateOnly(11);
   const base = {
     ...model.DEFAULT_CONFIG,
     api: {
@@ -96,11 +105,11 @@ test('preset export/import reuses recipe structure but preserves current event i
       ...model.DEFAULT_CONFIG.basics,
       name: 'Current Event Name',
       slug: 'currenteventname',
-      startDate: '2026-06-10',
+      startDate: currentStartDate,
       startTime: '09:00',
-      endDate: '2026-06-11',
+      endDate: currentEndDate,
       endTime: '17:00',
-      onCallDate: '2026-06-11',
+      onCallDate: currentEndDate,
     },
     bidders: {
       ...model.DEFAULT_CONFIG.bidders,
@@ -118,9 +127,9 @@ test('preset export/import reuses recipe structure but preserves current event i
       ...base.basics,
       name: 'Preset Event Name',
       slug: 'preseteventname',
-      startDate: '2026-08-01',
-      endDate: '2026-08-02',
-      onCallDate: '2026-08-02',
+      startDate: futureDateOnly(40),
+      endDate: futureDateOnly(41),
+      onCallDate: futureDateOnly(41),
     },
     bidders: {
       ...base.bidders,
@@ -140,7 +149,7 @@ test('preset export/import reuses recipe structure but preserves current event i
   const imported = model.importPresetConfig(base, preset);
   assert.equal(imported.basics.name, 'Current Event Name');
   assert.equal(imported.basics.slug, 'currenteventname');
-  assert.equal(imported.basics.startDate, '2026-06-10');
+  assert.equal(imported.basics.startDate, currentStartDate);
   assert.equal(imported.items.bulk.silentCount, 3);
   assert.equal(imported.items.bulk.liveCount, 2);
   assert.equal(imported.bidders.bulk.count, 7);
