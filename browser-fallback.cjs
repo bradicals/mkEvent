@@ -241,6 +241,50 @@ async function stripeOnboardingPost(page, action) {
   }, action);
 }
 
+// Ticket 7720: create a per-event custom "Other" payment type via ClickBid's
+// Laravel endpoint. In-page fetch so session cookies + the page's csrf meta
+// ride along (mirrors ClickBid's own admin fetch helper).
+async function postCustomPaymentType(page, eventSlug, name) {
+  return page.evaluate(async ({ slug, typeName }) => {
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    const response = await fetch(`/app/public/admin/${slug}/custom-payment-types`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'X-CSRF-TOKEN': csrf,
+      },
+      body: JSON.stringify({ name: typeName }),
+    });
+    const text = await response.text();
+    let json = null;
+    try {
+      json = JSON.parse(text);
+    } catch (_) {
+      json = { success: false, message: text };
+    }
+    return { status: response.status, body: json };
+  }, { slug: eventSlug, typeName: name });
+}
+
+async function seedCustomPaymentTypes(page, eventSlug, names) {
+  const applied = [];
+  const warnings = [];
+  for (const name of (Array.isArray(names) ? names : [])) {
+    try {
+      const result = await postCustomPaymentType(page, eventSlug, name);
+      if (result.status < 400 && result.body?.success) {
+        applied.push({ setting: 'customPaymentTypes', applied: true, name, id: result.body?.custom_payment_type?.id });
+      } else {
+        warnings.push({ setting: 'customPaymentTypes', name, message: result.body?.message || `HTTP ${result.status}` });
+      }
+    } catch (error) {
+      warnings.push({ setting: 'customPaymentTypes', name, message: error.message });
+    }
+  }
+  return { applied, warnings };
+}
+
 async function assignExistingMerchantAccount(page) {
   process.stderr.write('[fallback] Checking for existing Stripe merchant account...\n');
   const check = await stripeOnboardingPost(page, 'check_existing_account');
@@ -369,7 +413,7 @@ async function fetchCsrfTokenFromButler(page, payload) {
   return csrfToken;
 }
 
-async function applyAuctionSettings(page, baseUrl, eventId, settings) {
+async function applyAuctionSettings(page, baseUrl, eventId, eventSlug, settings) {
   const requested = settings || {};
   if (requested.enabled === false) {
     return { applied: [], skipped: [{ section: 'auctionSettings', reason: 'disabled' }], warnings: [] };
@@ -447,6 +491,12 @@ async function applyAuctionSettings(page, baseUrl, eventId, settings) {
     } catch (error) {
       warnings.push({ selector: '[name="cc_fee_description"]', message: error.message });
     }
+  }
+
+  if (Array.isArray(requested.customPaymentTypes) && requested.customPaymentTypes.length) {
+    const seeded = await seedCustomPaymentTypes(page, eventSlug, requested.customPaymentTypes);
+    seeded.applied.forEach(record);
+    warnings.push(...seeded.warnings);
   }
 
   process.stderr.write(`[fallback] Auction settings applied=${applied.length}, skipped=${skipped.length}, warnings=${warnings.length}\n`);
@@ -2924,7 +2974,7 @@ async function createEventViaAdmin(payload) {
 
     let auctionSettingsResult = null;
     if (payload.auctionSettings && payload.auctionSettings.enabled !== false) {
-      auctionSettingsResult = await applyAuctionSettings(page, payload.baseUrl, eventId, payload.auctionSettings);
+      auctionSettingsResult = await applyAuctionSettings(page, payload.baseUrl, eventId, eventSlug, payload.auctionSettings);
     }
 
     let ticketPagesResult = null;
@@ -3034,6 +3084,7 @@ module.exports = {
   filterPostCreateAuctionItems,
   filterPostCreateDonationItems,
   resolveTicketPurchasePaymentSupport,
+  seedCustomPaymentTypes,
   navigateTicketPurchaseSection,
   shouldUseBrowserCheckout,
   assignDonationFlags,

@@ -663,3 +663,25 @@ test('ticketPurchaseConcurrencyForPlan uses browser concurrency for credit-card/
   // a plan with no credit-card purchases uses the fast API concurrency
   assert.equal(fallback.ticketPurchaseConcurrencyForPlan(['check', 'cash', 'invoice']), api);
 });
+
+test('seedCustomPaymentTypes posts each name in-page and records applied/warnings', async () => {
+  const calls = [];
+  const page = {
+    evaluate: async (_fn, arg) => {
+      calls.push(arg);
+      if (arg.typeName === 'xy') {
+        return { status: 422, body: { message: 'The name field must be at least 3 characters.' } };
+      }
+      return { status: 200, body: { success: true, custom_payment_type: { id: calls.length, name: arg.typeName } } };
+    },
+  };
+
+  const result = await fallback.seedCustomPaymentTypes(page, 'my-event', ['Venmo', 'xy', 'Zelle']);
+
+  assert.deepEqual(calls.map((c) => c.slug), ['my-event', 'my-event', 'my-event']);
+  assert.equal(result.applied.length, 2);
+  assert.equal(result.applied[0].name, 'Venmo');
+  assert.equal(result.applied[0].id, 1);
+  assert.equal(result.warnings.length, 1);
+  assert.match(result.warnings[0].message, /at least 3 characters/);
+});
