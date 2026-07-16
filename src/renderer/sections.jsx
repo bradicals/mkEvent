@@ -1424,6 +1424,14 @@ export function PostCreateActivityBody({ data, ticketPages, auctionSettings, set
             </div>
           </div>
         )}
+        {butler.enabled && donations.enabled && auctionSettings?.requireCreditCard !== false && (
+          <div className="field span-full">
+            <div className="callout warn">
+              <i className="fa-solid fa-triangle-exclamation"></i>
+              <div><strong>Require Credit Card is on</strong> — seeded bidders have no cards on file, so donation seeding fails (&quot;Payment method is required&quot;) and leaves nothing to check out. Set Require Credit Card Info to &quot;No&quot; in Auction Settings.</div>
+            </div>
+          </div>
+        )}
         {customTypeNames.map((name) => (
           <div className="field" key={name}>
             <label>{name} checkouts</label>
