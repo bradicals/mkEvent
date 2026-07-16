@@ -1328,3 +1328,16 @@ test('summarizeRecipe publicUrl reflects the primary ticket-page form name', () 
   });
   assert.equal(model.summarizeRecipe(withDefault).publicUrl, 'https://qa1234.cbo.bid');
 });
+
+test('butler checkouts: default off, counts coerced, short names and zero counts dropped', () => {
+  const off = model.normalizePostCreateActivity({}, model.DEFAULT_CONFIG.ticketPages);
+  assert.deepEqual(off.butlerCheckouts, { enabled: false, perType: {} });
+
+  const normalized = model.normalizePostCreateActivity({
+    butlerCheckouts: {
+      enabled: true,
+      perType: { Venmo: '2', xy: 5, Zelle: -3, 'Gift Card': 0 },
+    },
+  }, model.DEFAULT_CONFIG.ticketPages);
+  assert.deepEqual(normalized.butlerCheckouts, { enabled: true, perType: { Venmo: 2 } });
+});

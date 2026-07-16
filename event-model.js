@@ -326,6 +326,10 @@
         amountMax: 250,
         anonymousRate: 25,
       },
+      butlerCheckouts: {
+        enabled: false,
+        perType: {},
+      },
     },
   });
 
@@ -689,6 +693,20 @@
     };
   }
 
+  // Butler checkouts of winning bids using custom "Other" payment types.
+  // perType maps a custom type name -> number of bidder-checkouts using it.
+  // Unknown-on-event names are warned about at runtime, not dropped here.
+  function normalizeButlerCheckouts(section) {
+    const base = section || {};
+    const perType = {};
+    Object.entries(base.perType || {}).forEach(([name, count]) => {
+      const clean = clampString(name, 100).trim();
+      const n = Math.floor(Number(count) || 0);
+      if (clean.length >= 3 && n > 0) perType[clean] = n;
+    });
+    return { enabled: Boolean(base.enabled), perType };
+  }
+
   function normalizeTicketPurchasePaymentMix(purchaseBase, defaults) {
     const rawMix = purchaseBase?.paymentMix || {};
     const hasExplicitMix = Object.keys(rawMix).length > 0;
@@ -812,6 +830,7 @@
       },
       auctionActivity: normalizeAuctionActivity(base.auctionActivity),
       donationActivity: normalizeDonationActivity(base.donationActivity),
+      butlerCheckouts: normalizeButlerCheckouts(base.butlerCheckouts),
     };
   }
 
