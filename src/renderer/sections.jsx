@@ -650,6 +650,7 @@ export function AuctionSettingsBody({ data, bidders, set }) {
           </div>
           <div className="chip-add">
             <input
+              type="text"
               value={typeDraft}
               placeholder="e.g. Venmo"
               maxLength={100}
