@@ -1481,6 +1481,57 @@ function buildTicketPurchaseExecutionPlan(ticketPurchases) {
   return plan;
 }
 
+function buildButlerCheckoutPlan(perType, typeIdsByName) {
+  const plan = [];
+  const warnings = [];
+  Object.entries(perType || {}).forEach(([name, count]) => {
+    const match = typeIdsByName.get(String(name).toLowerCase());
+    if (!match) {
+      warnings.push({ section: 'butlerCheckouts', name, message: `custom payment type "${name}" not found on the event` });
+      return;
+    }
+    const n = Math.max(0, Math.floor(Number(count) || 0));
+    for (let i = 0; i < n; i += 1) plan.push({ typeName: match.name, typeId: match.id });
+  });
+  return { plan, warnings };
+}
+
+// Builds the urlencoded fields for POST /ajax/butler/checkout.php exactly like
+// ClickBid's butler checkout.js: rows are a JSON string (max_input_vars dodge),
+// payTypeId=99 is "Other" (skips payment processing), checkOutMethodId=4 is
+// the Butler channel. The server enforces sum(rows subTotal+taxAmount) ==
+// its own recomputed total == totalAmount, so totals derive from the rows.
+function buildButlerCheckoutPostData({ csrfToken, bidderId, scraped, customPaymentTypeId }) {
+  const round2 = (n) => Math.round(n * 100) / 100;
+  const taxAmount = scraped.rows.reduce((sum, row) => sum + (Number(row.taxAmount) || 0), 0);
+  const totalAmount = scraped.rows.reduce(
+    (sum, row) => sum + (Number(row.subTotal) || 0) + (Number(row.taxAmount) || 0),
+    0,
+  );
+  return {
+    action: 'checkout',
+    csrf: csrfToken,
+    bidderId: String(bidderId),
+    fmvAmount: String(scraped.fmvAmount ?? 0),
+    bidAmount: String(scraped.bidAmount ?? 0),
+    donationAmount: String(scraped.donationAmount ?? 0),
+    taxAmount: String(round2(taxAmount)),
+    totalAmount: String(round2(totalAmount)),
+    payTypeId: '99',
+    checkOutMethodId: '4',
+    checkNumber: '',
+    firstName: scraped.firstName || '',
+    lastName: scraped.lastName || '',
+    address: scraped.address || '',
+    address2: scraped.address2 || '',
+    city: scraped.city || '',
+    state: scraped.state || '',
+    zip: scraped.zip || '',
+    rows: JSON.stringify(scraped.rows),
+    ...(customPaymentTypeId ? { customPaymentTypeId: String(customPaymentTypeId) } : {}),
+  };
+}
+
 function resolveTicketPurchasePaymentSupport(pageConfig) {
   const settings = pageConfig?.settings || {};
   return {
@@ -3076,6 +3127,8 @@ module.exports = {
   buildTicketPurchaseRequestData,
   buildTicketPurchaseSeedData,
   buildTicketPurchaseExecutionPlan,
+  buildButlerCheckoutPlan,
+  buildButlerCheckoutPostData,
   buildTicketPageItemAttachmentPlans,
   createBidderSessionCache,
   createTemporaryCheckoutPage,

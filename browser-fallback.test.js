@@ -685,3 +685,50 @@ test('seedCustomPaymentTypes posts each name in-page and records applied/warning
   assert.equal(result.warnings.length, 1);
   assert.match(result.warnings[0].message, /at least 3 characters/);
 });
+
+test('buildButlerCheckoutPlan expands per-type counts and warns on unknown types', () => {
+  const typeIds = new Map([
+    ['venmo', { id: '281', name: 'Venmo' }],
+    ['zelle', { id: '282', name: 'Zelle' }],
+  ]);
+  const { plan, warnings } = fallback.buildButlerCheckoutPlan({ Venmo: 2, Zelle: 1, Missing: 3 }, typeIds);
+
+  assert.deepEqual(plan, [
+    { typeName: 'Venmo', typeId: '281' },
+    { typeName: 'Venmo', typeId: '281' },
+    { typeName: 'Zelle', typeId: '282' },
+  ]);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0].message, /Missing/);
+});
+
+test('buildButlerCheckoutPostData computes totals from rows and JSON-stringifies them', () => {
+  const scraped = {
+    rows: [
+      { itemId: '644788', bidId: '1990465', taxable: '1', taxRate: '7', taxAmount: 1.75, typeId: 40, fmv: '0', quantityCount: '3', quantityPurchased: '1', subTotal: 25 },
+      { itemId: '644789', bidId: '1990466,1990467', taxable: '0', taxRate: '0', taxAmount: 0, typeId: 30, fmv: '0', quantityCount: 0, quantityPurchased: '', subTotal: 40 },
+    ],
+    firstName: 'QA', lastName: 'Automation',
+    address: '', address2: '', city: '', state: '', zip: '',
+    fmvAmount: 0, bidAmount: 25, donationAmount: 40,
+  };
+
+  const postData = fallback.buildButlerCheckoutPostData({
+    csrfToken: 'tok123', bidderId: 3398207, scraped, customPaymentTypeId: '281',
+  });
+
+  assert.equal(postData.action, 'checkout');
+  assert.equal(postData.csrf, 'tok123');
+  assert.equal(postData.bidderId, '3398207');
+  assert.equal(postData.payTypeId, '99');
+  assert.equal(postData.checkOutMethodId, '4');
+  assert.equal(postData.checkNumber, '');
+  assert.equal(postData.taxAmount, '1.75');
+  assert.equal(postData.totalAmount, '66.75'); // 25 + 1.75 + 40
+  assert.equal(postData.customPaymentTypeId, '281');
+  assert.equal(typeof postData.rows, 'string');
+  assert.equal(JSON.parse(postData.rows).length, 2);
+
+  const noType = fallback.buildButlerCheckoutPostData({ csrfToken: 't', bidderId: 1, scraped });
+  assert.equal('customPaymentTypeId' in noType, false);
+});
