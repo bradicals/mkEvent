@@ -1192,13 +1192,22 @@ export function PostCreateActivityBody({ data, ticketPages, auctionSettings, set
   const commitDonations = (patch) => commit({ donationActivity: { ...donations, ...patch } });
   const commitPaymentMix = (method, value) => commitPurchase({ paymentMix: { ...(purchase.paymentMix || {}), [method]: Math.max(0, Number(value) || 0) } });
   const butler = activity.butlerCheckouts || MODEL.DEFAULT_CONFIG.postCreateActivity.butlerCheckouts;
-  const commitButler = (patch) => commit({ butlerCheckouts: { ...butler, ...patch } });
-  const commitButlerCount = (name, value) => commitButler({
-    perType: { ...(butler.perType || {}), [name]: Math.max(0, Number(value) || 0) },
-  });
   const customTypeNames = Array.isArray(auctionSettings?.customPaymentTypes)
     ? auctionSettings.customPaymentTypes
     : MODEL.DEFAULT_CONFIG.auctionSettings.customPaymentTypes;
+  // Chips removed on the Auction step leave orphaned counts behind; drop them
+  // on any butler edit so the recipe never carries hidden per-type state.
+  const commitButler = (patch) => {
+    const next = { ...butler, ...patch };
+    const allowed = new Set(customTypeNames.map((n) => n.toLowerCase()));
+    next.perType = Object.fromEntries(
+      Object.entries(next.perType || {}).filter(([name]) => allowed.has(name.toLowerCase())),
+    );
+    commit({ butlerCheckouts: next });
+  };
+  const commitButlerCount = (name, value) => commitButler({
+    perType: { ...(butler.perType || {}), [name]: Math.max(0, Number(value) || 0) },
+  });
 
   return (
     <div className="section-pane-stack">
@@ -1429,6 +1438,14 @@ export function PostCreateActivityBody({ data, ticketPages, auctionSettings, set
             <div className="callout warn">
               <i className="fa-solid fa-triangle-exclamation"></i>
               <div><strong>Require Credit Card is on</strong> — seeded bidders have no cards on file, so donation seeding fails (&quot;Payment method is required&quot;) and leaves nothing to check out. Set Require Credit Card Info to &quot;No&quot; in Auction Settings.</div>
+            </div>
+          </div>
+        )}
+        {butler.enabled && auctionSettings?.enabled === false && (
+          <div className="field span-full">
+            <div className="callout warn">
+              <i className="fa-solid fa-triangle-exclamation"></i>
+              <div><strong>Auction settings are off</strong> — custom payment types are only seeded when &quot;Apply post-create auction settings&quot; is enabled, so butler checkouts will find no types to use.</div>
             </div>
           </div>
         )}
