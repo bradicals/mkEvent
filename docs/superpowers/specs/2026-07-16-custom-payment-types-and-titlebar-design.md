@@ -15,16 +15,25 @@ Two features, one branch (approved by Brad):
 ## Feature 1 — Custom payment types setting
 
 ClickBid now stores per-event custom "Other" payment types, managed on
-`/admin/auction_settings.php` (Payments panel) and saved via a JSON endpoint:
+`/admin/auction_settings.php` (Payments panel). Contract confirmed from ClickBid
+source (clickbid4 branch `origin/7720-other-payment-types`,
+`CustomPaymentTypeController` + `resources/assets/js/admin/auction-settings.js`):
 
 ```
-POST {base}/app/public/admin/{eventSlug}/custom-payment-types
-Content-Type: application/json
-{"name": "Venmo"}
+POST   {base}/app/public/admin/{eventSlug}/custom-payment-types        {"name": "Venmo"}
+PATCH  {base}/app/public/admin/{eventSlug}/custom-payment-types/{id}   (rename)
+DELETE {base}/app/public/admin/{eventSlug}/custom-payment-types/{id}
 ```
 
-Session cookies carry auth. mkEvent seeds these at event creation so QA events
-exercise the feature with zero manual setup.
+- `{eventSlug}` is the **event** slug — Laravel route `Route::prefix('admin/{event:slug}')`.
+- No GET/list route; the settings page server-renders rows from `$event->customPaymentTypes`.
+- Auth: session cookies + `X-CSRF-TOKEN` header from the page's `csrf-token` meta
+  (ClickBid's own `fetchPost` helper does exactly this; an empty token is accepted).
+- Validation: `name` required, min 3 / max 100 chars; duplicates allowed; no max count.
+- POST/PATCH response: `{"success": true, "message": ..., "custom_payment_type": {"id": ..., "name": ..., ...}}`.
+
+mkEvent seeds these at event creation so QA events exercise the feature with
+zero manual setup.
 
 ### Model (`event-model.js`)
 
@@ -32,8 +41,9 @@ exercise the feature with zero manual setup.
   (stocked defaults, per Brad).
 - New `normalizeCustomPaymentTypes(value)` mirroring `normalizeCustomQuestionAnswers`
   (event-model.js:490): accepts an array or comma-separated string; trims,
-  `clampString(80)`, drops empties, dedupes exact matches. **Missing/undefined →
-  stocked defaults; explicitly empty array → stays empty** (user removed all chips).
+  `clampString(100)`, drops entries shorter than 3 chars (server rule:
+  `min:3|max:100`), dedupes exact matches. **Missing/undefined → stocked
+  defaults; explicitly empty array → stays empty** (user removed all chips).
 - Called from `normalizeAuctionSettings()` (event-model.js:436). Recipes, presets,
   exports, and imports pick the field up automatically via the existing
   `buildRecipe`/`exportRecipeConfig`/`importRecipeConfig` funnels. No version bump —
@@ -50,7 +60,8 @@ New field directly after "Enable Link?" (sections.jsx:591-620):
   9999px radius) with an × remove button using the existing danger-hover recipe
   (`#fef2f2` bg / `#b91c1c` fg).
 - Text input + "Add" button (`btn btn-outline btn-sm`); Enter key also adds.
-  Blank/duplicate entries are ignored.
+  Blank, under-3-character, and duplicate entries are ignored (mirrors server
+  validation so seeding never 422s).
 - Writes via the existing section patcher: `set({ customPaymentTypes: [...] })`.
 - Small CSS additions to `app.css` using existing tokens only (theme-safe in
   light/dark).
@@ -62,40 +73,60 @@ New field directly after "Enable Link?" (sections.jsx:591-620):
   authenticated and on the auction-settings page. The HTTP-only admin channel is
   intentionally not involved (creation-engine.js:353 forces the browser path).
 - New helper `addCustomPaymentTypes(page, baseUrl, eventSlug, names)`: in-page
-  `fetch` POST per name (JSON body, `accept: application/json`; include
-  `X-XSRF-TOKEN` decoded from the `XSRF-TOKEN` cookie if present). Same
-  no-DOM pattern as `stripeOnboardingPost()` (browser-fallback.cjs:222).
+  `fetch` POST per name (JSON body, `accept: application/json`, `X-CSRF-TOKEN`
+  from the page's `csrf-token` meta — matching ClickBid's own `fetchPost`
+  helper). Same no-DOM pattern as `stripeOnboardingPost()`
+  (browser-fallback.cjs:222). The response's `custom_payment_type.id` is
+  captured into the step record (useful for logs; butler checkouts re-resolve
+  ids independently).
 - Called at the end of `applyAuctionSettings()` when
   `settings.customPaymentTypes?.length`. Each name records into the existing
   `applied`/`skipped`/`warnings` summary — a failed POST warns, never kills the run.
 - `applyAuctionSettings` gains the event slug (available in the fallback payload;
-  mkEvent sets the slug at create time).
-- **Assumption to verify on triage during implementation**: the `{slug}` path
-  segment (`plazacruise` in the captured request) is the *event* slug, not the
-  org slug. The ticket's copy-to-new-event behavior implies per-event storage.
-  If it turns out to be the org slug, the helper swaps in that value — no other
-  design change.
+  mkEvent sets the slug at create time; confirmed the route binds the **event**
+  slug).
 
 ### Post-create activity — butler winning-bid checkouts
 
 New post-create activity: check out winning bidders through butler using the
 custom "Other" payment types, so Paid Checkouts / statements / reports have data
-to show. Captured contract (from a real triage checkout):
+to show. Contract confirmed from ClickBid source (`ajax/butler/checkout.php` on
+the `7720-other-payment-types` branch), matching the captured triage request:
 
 ```
 POST {base}/ajax/butler/checkout.php        (urlencoded, X-Requested-With: XMLHttpRequest)
-action=checkout & csrf={butler csrf} & bidderId=...
+action=checkout & csrf={butler session token} & bidderId=...
 & fmvAmount & bidAmount & donationAmount=0 & taxAmount & totalAmount
 & payTypeId=99 & checkOutMethodId=4 & checkNumber=
 & firstName & lastName & address/address2/city/state/zip (blank ok)
-& rows=[{itemId, bidId, taxable, taxRate, taxAmount, typeId, fmv,
-         quantityCount, quantityPurchased, subTotal}]
+& rows=JSON string of [{itemId, bidId, taxable, taxRate, taxAmount, typeId, fmv,
+                        quantityCount, quantityPurchased, subTotal}]
 & customPaymentTypeId={id of the custom type record}
 ```
 
-`checkOutMethodId=4` is the "Other" method; `customPaymentTypeId` points at the
-per-event custom type record. One checkout = one bidder with **all** their
-current winning-bid rows.
+Key semantics (all from source):
+
+- `payTypeId=99` = the fixed "Other" pay type — it selects the custom-type
+  dropdown at checkout and **skips payment processing entirely** (like
+  check/cash), ideal for QA seeding. `checkOutMethodId=4` = "Butler" (the
+  checkout *channel*, not the payment).
+- `customPaymentTypeId` is optional; the server resolves it scoped to the
+  session's event and snapshots the type's **name** onto
+  `checkouts.custom_payment_name` — the immutable-per-checkout behavior from the
+  ticket. Unknown ids are silently ignored (checkout still succeeds, name blank).
+- `rows` must be a JSON-encoded *string* (server dodges `max_input_vars`). The
+  server only reads `itemId, bidId, subTotal, taxAmount` per row and recomputes
+  the rest, but enforces a strict three-way match: sum(rows subTotal+taxAmount)
+  == server-recomputed total == `totalAmount`.
+- CSRF: the shared butler session token (`X-CSRF-TOKEN` header or `csrf` field)
+  — the same token mkEvent's existing `fetchCsrfTokenFromButler()` already
+  scrapes.
+- Response: `{success, redirect?, message}`.
+- One checkout = one bidder with **all** their current unpaid winning-bid rows.
+- "Winning" is time-sensitive: donation/quantity/credit bids are checkout-able
+  immediately; **silent/live auction bids only count after their items close**.
+  Runs on a fresh event will mostly check out donation activity unless items
+  have closed.
 
 **Model** (`event-model.js`):
 
@@ -115,32 +146,42 @@ current winning-bid rows.
   AuctionSettingsBody receiving `bidders`). Empty type list → help text pointing
   at Auction Settings.
 - Inline hint (existing warning-banner pattern) when butler checkouts are
-  enabled but auction activity is disabled or `bidCount` is 0 — no bids means no
-  winners to check out.
+  enabled but both auction activity and donation activity are disabled — nothing
+  will be checkout-able. Help text notes that donation bids check out
+  immediately while silent/live auction bids only count once their items close.
 
 **Engine** (`browser-fallback.cjs`, `post-create-activity` action):
 
-- Runs after auction activity. Steps:
-  1. GET `{base}/app/public/admin/{eventSlug}/custom-payment-types` to map
-     type name → id (decoupled from the create step, which runs in a separate
-     fallback process).
-  2. Discover winning bidders + their row data from butler's own data source
-     (the ajax the butler checkout page uses — to be captured on triage during
-     implementation; ClickBid is the source of truth since mkEvent's seeded
-     bids don't retain bid ids and can be outbid).
-  3. Assign distinct winner-bidders to types per the `perType` counts, build the
-     `rows` payload from butler's data, compute totals, POST `action=checkout`
-     with the existing butler CSRF helper (`fetchCsrfTokenFromButler`,
-     browser-fallback.cjs:354) via the existing `postAdminForm` pattern (:627).
+- Runs after auction/donation activity. Steps (all confirmed against ClickBid
+  source; no remaining discovery):
+  1. **Map type name → id**: there is no GET/list route, and the create step runs
+     in a separate fallback process, so navigate to
+     `/admin/auction_settings.php` and read the server-rendered
+     `div.custom-payment-types` rows (each carries `data-id` + the name input
+     value).
+  2. **Find checkout-able bidders**: for mkEvent's own seeded bidders, POST
+     `/ajax/butler/event-utilities.php` with `action=get-bidder-by-id`
+     (`csrf`, `bidder_id`) → response carries
+     `bidder.winning.before_closing/after_closing` plus
+     `checkout_queue_exists`; keep bidders with non-empty winning arrays and no
+     queued checkout. (ClickBid stays the source of truth — mkEvent's seeded
+     bids don't retain bid ids and can be outbid.)
+  3. **Fetch rows the way butler itself does**: POST the page
+     `/butler/checkout.php` (`csrf`, `bidder-id`, `loc=butler`) and scrape the
+     rendered `.item-row` checkboxes' `data-*` attributes — they carry every
+     rows-payload field, server-computed, which guarantees the three-way total
+     check passes. Totals (`fmvAmount/bidAmount/taxAmount/totalAmount`) are
+     summed exactly as `resources/assets/js/butler/checkout.js` does.
+  4. **Check out**: assign distinct winner-bidders to types per the `perType`
+     counts and POST `action=checkout` (urlencoded, `rows` JSON-stringified,
+     `payTypeId=99`, `checkOutMethodId=4`, `customPaymentTypeId` from step 1,
+     bidder name from step 2) using the existing butler CSRF helper
+     (`fetchCsrfTokenFromButler`, browser-fallback.cjs:354) via the existing
+     `postAdminForm` pattern (:627).
 - Each checkout records into `applied`/`skipped`/`warnings`; shortfalls (fewer
   winning bidders than requested counts) warn and check out as many as possible.
-
-**Implementation-time discovery on triage** (all isolated to step 2 above):
-
-- Response shape of `POST custom-payment-types` (id capture is via the GET
-  listing anyway).
-- The butler endpoint returning a bidder's winning-bid/checkout rows.
-- Confirm `payTypeId=99` semantics (mirrored from the capture regardless).
+- Butler auth rides the existing admin session (the current CSRF helper already
+  hits `/butler/event-utilities.php` successfully in production).
 
 ### Error handling
 
