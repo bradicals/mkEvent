@@ -571,6 +571,15 @@ export function AuctionSettingsBody({ data, bidders, set }) {
   const effectiveStartingBidderNumber = settings.syncStartingBidderNumber ? bidderStart : settings.startingBidderNumber;
 
   const setBool = (key) => set({ [key]: !settings[key] });
+  const customPaymentTypes = Array.isArray(settings.customPaymentTypes) ? settings.customPaymentTypes : [];
+  const [typeDraft, setTypeDraft] = useState('');
+  const addCustomPaymentType = () => {
+    const name = typeDraft.trim();
+    if (name.length < 3 || name.length > 100) return;
+    if (customPaymentTypes.some((t) => t.toLowerCase() === name.toLowerCase())) return;
+    set({ customPaymentTypes: [...customPaymentTypes, name] });
+    setTypeDraft('');
+  };
 
   return (
     <div className="section-pane-stack">
@@ -617,6 +626,41 @@ export function AuctionSettingsBody({ data, bidders, set }) {
             <option value="0">No</option>
           </select>
           <div className="help">Depends on Stripe Link capability for the assigned account.</div>
+        </div>
+
+        <div className="field span-full">
+          <label>Other payment types</label>
+          <div className="chip-list">
+            {customPaymentTypes.map((name) => (
+              <span key={name} className="chip">
+                {name}
+                <button
+                  type="button"
+                  className="chip-remove"
+                  aria-label={`Remove ${name}`}
+                  onClick={() => set({ customPaymentTypes: customPaymentTypes.filter((t) => t !== name) })}
+                >
+                  <i className="fa-solid fa-xmark" />
+                </button>
+              </span>
+            ))}
+            {customPaymentTypes.length === 0 && (
+              <span className="help">No custom types — the event keeps only built-in payment methods.</span>
+            )}
+          </div>
+          <div className="chip-add">
+            <input
+              value={typeDraft}
+              placeholder="e.g. Venmo"
+              maxLength={100}
+              onChange={(e) => setTypeDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomPaymentType(); } }}
+            />
+            <button type="button" className="btn btn-outline btn-sm" onClick={addCustomPaymentType}>
+              <i className="fa-solid fa-plus" /> Add
+            </button>
+          </div>
+          <div className="help">Seeded on the new event under Payments → Other. Volunteers pick these from a dropdown at butler checkout. 3–100 characters each.</div>
         </div>
 
         <div className="field span-full">
